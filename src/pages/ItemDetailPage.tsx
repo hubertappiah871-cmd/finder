@@ -26,6 +26,10 @@ const ITEMS_SELECT = '*, reporter:profiles!items_reported_by_fkey(name, email)'
 const CLAIMS_SELECT =
   '*, item:items!claims_item_id_fkey(id, title, type, photo_url, status), claimant:profiles!claims_claimant_uid_fkey(name, email)'
 
+const OWNER_NAME_RE = /^[A-Za-z\s'-]+$/
+const PHONE_RE = /^0\d{9}$/
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 export default function ItemDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { profile } = useAuth()
@@ -36,9 +40,12 @@ export default function ItemDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  const [ownerName, setOwnerName] = useState('')
+  const [contactInfo, setContactInfo] = useState('')
   const [verification, setVerification] = useState('')
   const [claimBusy, setClaimBusy] = useState(false)
   const [claimError, setClaimError] = useState('')
+  const [claimFieldErrors, setClaimFieldErrors] = useState<Record<string, string>>({})
 
   const load = useCallback(async () => {
     if (!id) return
@@ -66,18 +73,54 @@ export default function ItemDetailPage() {
     void load()
   }, [load])
 
+  function validateClaim(): boolean {
+    const errs: Record<string, string> = {}
+
+    if (!ownerName.trim() || !OWNER_NAME_RE.test(ownerName.trim())) {
+      errs.ownerName = 'Enter your full name (letters, spaces, hyphens, apostrophes only).'
+    }
+
+    const contact = contactInfo.trim()
+    if (!contact) {
+      errs.contactInfo = 'Provide a phone number or email address.'
+    } else if (!PHONE_RE.test(contact) && !EMAIL_RE.test(contact)) {
+      errs.contactInfo = 'Must be a valid phone (0XXXXXXXXX) or email address.'
+    }
+
+    if (verification.trim().length < 15) {
+      errs.verification = 'Describe the item in enough detail (at least 15 characters).'
+    }
+
+    setClaimFieldErrors(errs)
+    return Object.keys(errs).length === 0
+  }
+
   async function submitClaim(e: FormEvent) {
     e.preventDefault()
     if (!profile || !item) return
-    if (verification.trim().length < 20) {
-      setClaimError('Please describe your item in enough detail (at least 20 characters).')
+    if (!validateClaim()) return
+
+    // Duplicate claim check
+    const { data: existingClaim } = await supabase
+      .from('claims')
+      .select('id')
+      .eq('item_id', item.id)
+      .eq('claimant_uid', profile.id)
+      .in('status', ['pending', 'meeting_required'])
+      .maybeSingle()
+
+    if (existingClaim) {
+      setClaimError('You already have an active claim for this item.')
       return
     }
+
     setClaimError('')
     setClaimBusy(true)
     const { error: err } = await supabase.from('claims').insert({
       item_id: item.id,
       claimant_uid: profile.id,
+      owner_name: ownerName.trim(),
+      contact_info: contactInfo.trim(),
       verification_details: verification.trim(),
     })
     setClaimBusy(false)
@@ -86,7 +129,10 @@ export default function ItemDetailPage() {
       return
     }
     toast('success', 'Claim submitted — the admin team has been notified.')
+    setOwnerName('')
+    setContactInfo('')
     setVerification('')
+    setClaimFieldErrors({})
     void load()
   }
 
@@ -229,10 +275,50 @@ export default function ItemDetailPage() {
                 {claimError}
               </div>
             )}
+
+            <div className="form-grid">
+              <FormField label="Your full name" htmlFor="owner-name" required error={claimFieldErrors.ownerName}>
+                <input
+                  id="owner-name"
+                  className="input"
+                  type="text"
+                  placeholder="e.g. Kwame Asante"
+                  value={ownerName}
+                  onChange={(e) => {
+                    setOwnerName(e.target.value)
+                    setClaimFieldErrors((prev) => {
+                      const next = { ...prev }
+                      delete next.ownerName
+                      return next
+                    })
+                  }}
+                />
+              </FormField>
+
+              <FormField label="Contact info" htmlFor="contact-info" required error={claimFieldErrors.contactInfo} hint="Phone (0XXXXXXXXX) or email address.">
+                <input
+                  id="contact-info"
+                  className="input"
+                  type="text"
+                  placeholder="e.g. 0241234567 or name@campus.edu"
+                  value={contactInfo}
+                  onChange={(e) => {
+                    setContactInfo(e.target.value)
+                    setClaimFieldErrors((prev) => {
+                      const next = { ...prev }
+                      delete next.contactInfo
+                      return next
+                    })
+                  }}
+                />
+              </FormField>
+            </div>
+
             <FormField
               label="Proof of ownership"
               htmlFor="verification"
               required
+              error={claimFieldErrors.verification}
               hint="Color, brand, contents, marks or serial numbers — anything that proves it is yours."
             >
               <textarea
@@ -243,7 +329,11 @@ export default function ItemDetailPage() {
                 value={verification}
                 onChange={(e) => {
                   setVerification(e.target.value)
-                  setClaimError('')
+                  setClaimFieldErrors((prev) => {
+                    const next = { ...prev }
+                    delete next.verification
+                    return next
+                  })
                 }}
               />
             </FormField>
@@ -270,9 +360,15 @@ export default function ItemDetailPage() {
               {myClaim.status === 'rejected' && myClaim.rejection_reason && (
                 <p className="muted">Reason: {myClaim.rejection_reason}</p>
               )}
+              {myClaim.status === 'meeting_required' && myClaim.meeting_details && (
+                <p className="muted">{myClaim.meeting_details}</p>
+              )}
             </div>
           </div>
-          <blockquote className="claim-verification">“{myClaim.verification_details}”</blockquote>
+          <blockquote className="claim-verification">"{myClaim.verification_details}"</blockquote>
+          {myClaim.owner_name && (
+            <p className="muted" style={{ marginTop: '0.5rem' }}>Name: {myClaim.owner_name} · Contact: {myClaim.contact_info}</p>
+          )}
         </section>
       )}
 
@@ -300,11 +396,17 @@ export default function ItemDetailPage() {
                     <p className="claim-row__meta">
                       {claim.claimant?.email} · {timeAgo(claim.created_at)}
                     </p>
-                    <blockquote className="claim-verification">“{claim.verification_details}”</blockquote>
+                    {claim.owner_name && (
+                      <p className="claim-row__meta">Name: {claim.owner_name} · Contact: {claim.contact_info}</p>
+                    )}
+                    <blockquote className="claim-verification">"{claim.verification_details}"</blockquote>
                     {claim.status === 'rejected' && claim.rejection_reason && (
                       <p className="muted">Rejection reason: {claim.rejection_reason}</p>
                     )}
-                    {isAdmin && claim.status === 'pending' && (
+                    {claim.status === 'meeting_required' && claim.meeting_details && (
+                      <p className="muted">Meeting: {claim.meeting_details}</p>
+                    )}
+                    {isAdmin && (claim.status === 'pending' || claim.status === 'meeting_required') && (
                       <div className="claim-row__actions">
                         <ClaimDecisionButtons claim={claim} onDone={() => void load()} />
                       </div>

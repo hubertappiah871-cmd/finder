@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Bell,
@@ -37,40 +37,45 @@ function UserDashboard() {
   const [recent, setRecent] = useState<ItemWithReporter[]>([])
   const [error, setError] = useState('')
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!profile) return
     const uid = profile.id
-    let active = true
-    async function load() {
-      const [lost, found, claims, unread, items] = await Promise.all([
-        supabase.from('items').select('*', { count: 'exact', head: true }).eq('type', 'lost').eq('reported_by', uid),
-        supabase.from('items').select('*', { count: 'exact', head: true }).eq('type', 'found').eq('reported_by', uid),
-        supabase.from('claims').select('*', { count: 'exact', head: true }).eq('claimant_uid', uid),
-        supabase
-          .from('notifications')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', uid)
-          .eq('read', false),
-        supabase.from('items').select(ITEMS_SELECT).order('created_at', { ascending: false }).limit(6),
-      ])
-      if (!active) return
-      if (lost.error || found.error || claims.error || unread.error || items.error) {
-        setError('Could not load your dashboard data. Please try again.')
-        return
-      }
-      setStats({
-        lost: lost.count ?? 0,
-        found: found.count ?? 0,
-        claims: claims.count ?? 0,
-        unread: unread.count ?? 0,
-      })
-      setRecent((items.data as ItemWithReporter[] | null) ?? [])
+    const [lost, found, claims, unread, items] = await Promise.all([
+      supabase.from('items').select('*', { count: 'exact', head: true }).eq('type', 'lost').eq('reported_by', uid),
+      supabase.from('items').select('*', { count: 'exact', head: true }).eq('type', 'found').eq('reported_by', uid),
+      supabase.from('claims').select('*', { count: 'exact', head: true }).eq('claimant_uid', uid),
+      supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', uid)
+        .eq('read', false),
+      supabase.from('items').select(ITEMS_SELECT).order('created_at', { ascending: false }).limit(6),
+    ])
+    if (lost.error || found.error || claims.error || unread.error || items.error) {
+      setError('Could not load your dashboard data. Please try again.')
+      return
     }
-    void load()
-    return () => {
-      active = false
-    }
+    setStats({
+      lost: lost.count ?? 0,
+      found: found.count ?? 0,
+      claims: claims.count ?? 0,
+      unread: unread.count ?? 0,
+    })
+    setRecent((items.data as ItemWithReporter[] | null) ?? [])
   }, [profile])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  // Refresh stats when the window regains focus (user navigates back from another page)
+  useEffect(() => {
+    function onFocus() {
+      void load()
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [load])
 
   if (!profile) return null
   const firstName = profile.name.split(' ')[0]
@@ -103,7 +108,7 @@ function UserDashboard() {
       </section>
 
       {error ? (
-        <ErrorState message={error} onRetry={() => window.location.reload()} />
+        <ErrorState message={error} onRetry={() => void load()} />
       ) : !stats ? (
         <LoadingScreen label="Loading your dashboard…" />
       ) : (
@@ -157,38 +162,43 @@ function AdminDashboard() {
   const [recent, setRecent] = useState<ItemWithReporter[]>([])
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    let active = true
-    async function load() {
-      const [total, open, resolved, pendingClaims, users, claimsRes, itemsRes] = await Promise.all([
-        supabase.from('items').select('*', { count: 'exact', head: true }),
-        supabase.from('items').select('*', { count: 'exact', head: true }).eq('status', 'open'),
-        supabase.from('items').select('*', { count: 'exact', head: true }).eq('status', 'resolved'),
-        supabase.from('claims').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('active', true),
-        supabase.from('claims').select(CLAIMS_SELECT).eq('status', 'pending').order('created_at', { ascending: false }).limit(5),
-        supabase.from('items').select(ITEMS_SELECT).order('created_at', { ascending: false }).limit(6),
-      ])
-      if (!active) return
-      if (total.error || open.error || resolved.error || pendingClaims.error || users.error || claimsRes.error || itemsRes.error) {
-        setError('Could not load the operations overview. Please try again.')
-        return
-      }
-      setStats({
-        total: total.count ?? 0,
-        open: open.count ?? 0,
-        resolved: resolved.count ?? 0,
-        pendingClaims: pendingClaims.count ?? 0,
-        users: users.count ?? 0,
-      })
-      setPendingClaims((claimsRes.data as ClaimWithRelations[] | null) ?? [])
-      setRecent((itemsRes.data as ItemWithReporter[] | null) ?? [])
+  const load = useCallback(async () => {
+    const [total, open, resolved, pendingClaims, users, claimsRes, itemsRes] = await Promise.all([
+      supabase.from('items').select('*', { count: 'exact', head: true }),
+      supabase.from('items').select('*', { count: 'exact', head: true }).eq('status', 'open'),
+      supabase.from('items').select('*', { count: 'exact', head: true }).eq('status', 'resolved'),
+      supabase.from('claims').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('active', true),
+      supabase.from('claims').select(CLAIMS_SELECT).eq('status', 'pending').order('created_at', { ascending: false }).limit(5),
+      supabase.from('items').select(ITEMS_SELECT).order('created_at', { ascending: false }).limit(6),
+    ])
+    if (total.error || open.error || resolved.error || pendingClaims.error || users.error || claimsRes.error || itemsRes.error) {
+      setError('Could not load the operations overview. Please try again.')
+      return
     }
-    void load()
-    return () => {
-      active = false
-    }
+    setStats({
+      total: total.count ?? 0,
+      open: open.count ?? 0,
+      resolved: resolved.count ?? 0,
+      pendingClaims: pendingClaims.count ?? 0,
+      users: users.count ?? 0,
+    })
+    setPendingClaims((claimsRes.data as ClaimWithRelations[] | null) ?? [])
+    setRecent((itemsRes.data as ItemWithReporter[] | null) ?? [])
   }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  // Refresh stats when the window regains focus
+  useEffect(() => {
+    function onFocus() {
+      void load()
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [load])
 
   if (!profile) return null
 
@@ -208,7 +218,7 @@ function AdminDashboard() {
       </div>
 
       {error ? (
-        <ErrorState message={error} onRetry={() => window.location.reload()} />
+        <ErrorState message={error} onRetry={() => void load()} />
       ) : !stats ? (
         <LoadingScreen label="Loading the overview…" />
       ) : (
@@ -239,7 +249,7 @@ function AdminDashboard() {
                     <span className="claim-preview__avatar">{initials(claim.claimant?.name ?? '?')}</span>
                     <span className="claim-preview__body">
                       <span className="claim-preview__line">
-                        {claim.claimant?.name ?? 'A user'} claimed “{claim.item?.title ?? 'item'}”
+                        {claim.claimant?.name ?? 'A user'} claimed "{claim.item?.title ?? 'item'}"
                       </span>
                       <span className="claim-preview__meta">{timeAgo(claim.created_at)} · {claim.item?.type === 'lost' ? 'Lost' : 'Found'} item</span>
                     </span>

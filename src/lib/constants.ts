@@ -24,8 +24,9 @@ export const ITEM_STATUS_META: Record<ItemStatus, { label: string; tone: 'gold' 
   resolved: { label: 'Resolved', tone: 'green' },
 }
 
-export const CLAIM_STATUS_META: Record<ClaimStatus, { label: string; tone: 'gold' | 'green' | 'red' }> = {
+export const CLAIM_STATUS_META: Record<ClaimStatus, { label: string; tone: 'gold' | 'green' | 'red' | 'blue' }> = {
   pending: { label: 'Pending', tone: 'gold' },
   approved: { label: 'Approved', tone: 'green' },
   rejected: { label: 'Rejected', tone: 'red' },
+  meeting_required: { label: 'Meeting Required', tone: 'blue' },
 }

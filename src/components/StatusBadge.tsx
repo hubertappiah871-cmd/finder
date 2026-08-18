@@ -13,6 +13,7 @@ const CLAIM_STATUS_ICON: Record<ClaimStatus, LucideIcon> = {
   pending: Clock,
   approved: BadgeCheck,
   rejected: CircleX,
+  meeting_required: Clock,
 }
 
 export function ItemStatusBadge({ status }: { status: ItemStatus }) {

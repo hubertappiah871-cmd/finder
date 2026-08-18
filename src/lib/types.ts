@@ -1,7 +1,7 @@
 export type Role = 'user' | 'admin'
 export type ItemType = 'lost' | 'found'
 export type ItemStatus = 'open' | 'claimed' | 'resolved'
-export type ClaimStatus = 'pending' | 'approved' | 'rejected'
+export type ClaimStatus = 'pending' | 'approved' | 'rejected' | 'meeting_required'
 
 /** profiles table */
 export interface Profile {
@@ -38,9 +38,13 @@ export interface Claim {
   id: string
   item_id: string
   claimant_uid: string
+  owner_name: string
+  contact_info: string
   verification_details: string
   status: ClaimStatus
   rejection_reason: string | null
+  admin_notes: string | null
+  meeting_details: string | null
   created_at: string
 }
 
@@ -48,6 +52,22 @@ export interface Claim {
 export interface ClaimWithRelations extends Claim {
   item: Pick<Item, 'id' | 'title' | 'type' | 'photo_url' | 'status'> | null
   claimant: Pick<Profile, 'name' | 'email'> | null
+}
+
+/** messages table */
+export interface Message {
+  id: string
+  claim_id: string
+  sender_id: string
+  recipient_id: string
+  body: string
+  created_at: string
+  read: boolean
+}
+
+/** Message with sender profile embedded */
+export interface MessageWithSender extends Message {
+  sender: Pick<Profile, 'name' | 'role'> | null
 }
 
 /** notifications table */
