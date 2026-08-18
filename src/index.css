@@ -29,6 +29,10 @@
   --line: #e2dbc8;
   --line-strong: #d2c9b0;
 
+  /* Derived neutral tones */
+  --navy-light: #e7edf5;
+  --placeholder: #9aa3b2;
+
   /* Status */
   --green: #14805b;
   --green-bg: #e4f3ec;
@@ -38,7 +42,14 @@
   --red-bg: #fbeae7;
   --amber: #8a6d1d;
   --amber-bg: #fbf3dc;
+  --amber-dark: #7a5e10;
 
+  /* Border radius scale — consistent across the app */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  /* Shadows */
   --shadow-sm: 0 1px 2px rgba(12, 35, 64, 0.07);
   --shadow-md: 0 8px 20px -8px rgba(12, 35, 64, 0.18);
   --shadow-lg: 0 20px 44px -14px rgba(12, 35, 64, 0.28);
@@ -108,7 +119,7 @@ a {
 
 .main {
   flex: 1;
-  padding: 30px 0 60px;
+  padding: 32px 0 60px;
 }
 
 .page {
@@ -116,7 +127,7 @@ a {
 }
 
 .section {
-  margin-bottom: 36px;
+  margin-bottom: 32px;
 }
 
 .section__head {
@@ -124,7 +135,7 @@ a {
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .section__head h2 {
@@ -146,7 +157,7 @@ a {
 .card {
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
 }
 
@@ -197,7 +208,7 @@ a {
   place-items: center;
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--gold-500);
   color: var(--navy-950);
   box-shadow: 0 2px 8px rgba(201, 162, 39, 0.4);
@@ -235,7 +246,7 @@ a {
   font: 500 13.5px/1 var(--font-body);
   text-decoration: none;
   padding: 8px 12px;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   border-bottom: 2px solid transparent;
   transition: color 0.15s, background 0.15s;
 }
@@ -263,7 +274,7 @@ a {
   place-items: center;
   width: 38px;
   height: 38px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   color: #c9d4e2;
   transition: background 0.15s, color 0.15s;
 }
@@ -327,7 +338,7 @@ a {
   place-items: center;
   width: 38px;
   height: 38px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(243, 238, 225, 0.18);
   background: transparent;
   color: #c9d4e2;
@@ -355,7 +366,7 @@ a {
   gap: 8px;
   font: 600 14px/1 var(--font-body);
   padding: 11px 18px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid transparent;
   cursor: pointer;
   text-decoration: none;
@@ -467,7 +478,7 @@ a {
 .btn--small {
   padding: 7px 12px;
   font-size: 13px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 
 .btn--block {
@@ -476,7 +487,7 @@ a {
 
 .btn--filtered {
   border-color: var(--gold-500);
-  color: #7a5e10;
+  color: var(--amber-dark);
   background: var(--gold-50);
 }
 
@@ -498,7 +509,7 @@ a {
   place-items: center;
   width: 34px;
   height: 34px;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--line-strong);
   background: #fff;
   color: var(--ink-soft);
@@ -587,7 +598,7 @@ a {
   width: 100%;
   padding: 10px 13px;
   border: 1px solid var(--line-strong);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: #fff;
   color: var(--ink);
   font: 500 14px/1.45 var(--font-body);
@@ -595,7 +606,7 @@ a {
 }
 
 .input::placeholder {
-  color: #9aa3b2;
+  color: var(--placeholder);
 }
 
 .input:focus {
@@ -617,11 +628,11 @@ textarea.input {
   font-size: 13px;
   font-weight: 600;
   padding: 6px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 
 .input--status-open {
-  color: #7a5e10;
+  color: var(--amber-dark);
   background: var(--amber-bg);
   border-color: #e4cd8b;
 }
@@ -660,7 +671,7 @@ textarea.input {
   gap: 12px;
   padding: 13px 14px;
   border: 1.5px solid var(--line-strong);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: #fff;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
@@ -686,7 +697,7 @@ textarea.input {
   place-items: center;
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--navy-800);
   color: var(--gold-300);
   flex-shrink: 0;
@@ -744,7 +755,7 @@ textarea.input {
   gap: 8px;
   padding: 30px 20px;
   border: 1.5px dashed var(--line-strong);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--cream-50);
   color: var(--muted);
   cursor: pointer;
@@ -756,7 +767,7 @@ textarea.input {
 .photo-upload__dropzone--over {
   border-color: var(--gold-500);
   background: var(--gold-50);
-  color: #7a5e10;
+  color: var(--amber-dark);
 }
 
 .photo-upload__title {
@@ -778,7 +789,7 @@ textarea.input {
   width: 100%;
   aspect-ratio: 16 / 10;
   object-fit: cover;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--line);
   display: block;
 }
@@ -792,7 +803,7 @@ textarea.input {
   width: 30px;
   height: 30px;
   border: none;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: rgba(10, 29, 51, 0.75);
   color: #fff;
   cursor: pointer;
@@ -859,7 +870,7 @@ textarea.input {
   gap: 10px;
   align-items: flex-start;
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   font-size: 13.5px;
   line-height: 1.5;
 }
@@ -937,7 +948,7 @@ textarea.input {
   place-items: center;
   width: 40px;
   height: 40px;
-  border-radius: 11px;
+  border-radius: var(--radius-md);
   background: var(--gold-500);
   color: var(--navy-950);
 }
@@ -1004,9 +1015,9 @@ textarea.input {
   max-width: 430px;
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
-  padding: 34px 32px;
+  padding: 32px 28px;
 }
 
 .auth__card h2 {
@@ -1046,7 +1057,7 @@ textarea.input {
   align-items: flex-end;
   justify-content: space-between;
   gap: 18px;
-  margin-bottom: 26px;
+  margin-bottom: 28px;
 }
 
 .page-header__title {
@@ -1074,13 +1085,13 @@ textarea.input {
 
 .hero-card {
   position: relative;
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   padding: 36px 40px;
   color: #f3eee1;
   background: linear-gradient(140deg, var(--navy-950), var(--navy-700) 70%, var(--navy-600));
   box-shadow: var(--shadow-md);
   overflow: hidden;
-  margin-bottom: 30px;
+  margin-bottom: 32px;
 }
 
 .hero-card::after {
@@ -1127,7 +1138,7 @@ textarea.input {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 14px;
-  margin-bottom: 34px;
+  margin-bottom: 32px;
 }
 
 .stats-grid--compact {
@@ -1140,7 +1151,7 @@ textarea.input {
   gap: 14px;
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   padding: 16px 18px;
   box-shadow: var(--shadow-sm);
   transition: box-shadow 0.2s, transform 0.2s;
@@ -1161,13 +1172,13 @@ textarea.input {
 }
 
 .stat-card__icon--navy {
-  background: #e7edf5;
+  background: var(--navy-light);
   color: var(--navy-700);
 }
 
 .stat-card__icon--gold {
   background: var(--gold-100);
-  color: #8a6d1d;
+  color: var(--amber);
 }
 
 .stat-card__icon--green {
@@ -1212,7 +1223,7 @@ textarea.input {
   flex-direction: column;
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   text-decoration: none;
   color: inherit;
@@ -1313,7 +1324,7 @@ textarea.input {
 }
 
 .item-card__meta svg {
-  color: #9aa3b2;
+  color: var(--placeholder);
   flex-shrink: 0;
 }
 
@@ -1327,7 +1338,7 @@ textarea.input {
   align-items: center;
   background: #fff;
   border: 1.5px solid var(--line-strong);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 0 14px;
   margin-bottom: 14px;
   transition: border-color 0.15s, box-shadow 0.15s;
@@ -1354,7 +1365,7 @@ textarea.input {
 }
 
 .search-bar__input::placeholder {
-  color: #9aa3b2;
+  color: var(--placeholder);
 }
 
 .search-bar__clear {
@@ -1363,7 +1374,7 @@ textarea.input {
   width: 28px;
   height: 28px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
@@ -1392,7 +1403,7 @@ textarea.input {
   display: inline-flex;
   background: var(--cream-100);
   border: 1px solid var(--line);
-  border-radius: 11px;
+  border-radius: var(--radius-md);
   padding: 3px;
   gap: 2px;
 }
@@ -1401,7 +1412,7 @@ textarea.input {
   border: none;
   background: transparent;
   padding: 8px 18px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font: 600 13px/1 var(--font-body);
   color: var(--ink-soft);
   cursor: pointer;
@@ -1479,7 +1490,7 @@ textarea.input {
 }
 
 .detail-media {
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid var(--line);
   background: var(--cream-100);
@@ -1522,7 +1533,7 @@ textarea.input {
   margin: 0;
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 
@@ -1577,7 +1588,7 @@ textarea.input {
   place-items: center;
   width: 40px;
   height: 40px;
-  border-radius: 11px;
+  border-radius: var(--radius-md);
   background: var(--gold-100);
   color: var(--gold-600);
   flex-shrink: 0;
@@ -1614,7 +1625,7 @@ textarea.input {
   gap: 14px;
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   padding: 18px 20px;
   box-shadow: var(--shadow-sm);
 }
@@ -1673,7 +1684,7 @@ textarea.input {
   padding: 12px 16px;
   background: var(--cream-100);
   border-left: 3px solid var(--gold-400);
-  border-radius: 0 10px 10px 0;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
   color: var(--ink-soft);
   font-size: 14px;
   line-height: 1.6;
@@ -1687,7 +1698,7 @@ textarea.input {
   color: inherit;
   background: var(--cream-50);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 10px 14px;
   margin-bottom: 10px;
   transition: border-color 0.15s;
@@ -1702,7 +1713,7 @@ textarea.input {
   place-items: center;
   width: 44px;
   height: 44px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   background: var(--cream-100);
   color: var(--muted);
@@ -1744,7 +1755,7 @@ textarea.input {
   gap: 12px;
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 13px 16px;
   text-decoration: none;
   color: inherit;
@@ -1796,7 +1807,7 @@ textarea.input {
   place-items: center;
   width: 42px;
   height: 42px;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   background: var(--cream-100);
   color: var(--muted);
@@ -1830,7 +1841,7 @@ textarea.input {
   text-align: left;
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 15px 17px;
   cursor: pointer;
   transition: border-color 0.15s, box-shadow 0.15s;
@@ -1853,7 +1864,7 @@ textarea.input {
   place-items: center;
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--cream-100);
   color: var(--gold-600);
   flex-shrink: 0;
@@ -1903,7 +1914,7 @@ textarea.input {
   gap: 14px;
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   padding: 15px 18px;
   text-decoration: none;
   color: inherit;
@@ -1920,7 +1931,7 @@ textarea.input {
   place-items: center;
   width: 56px;
   height: 56px;
-  border-radius: 11px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--cream-100);
   color: var(--muted);
@@ -1975,7 +1986,7 @@ textarea.input {
 .table-wrap {
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   overflow-x: auto;
   box-shadow: var(--shadow-sm);
 }
@@ -2029,7 +2040,7 @@ textarea.input {
   place-items: center;
   width: 42px;
   height: 42px;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   background: var(--cream-100);
   color: var(--muted);
@@ -2078,7 +2089,7 @@ textarea.input {
   gap: 6px;
   background: var(--cream-100);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 4px;
   margin-bottom: 18px;
   width: fit-content;
@@ -2093,7 +2104,7 @@ textarea.input {
   border: none;
   background: transparent;
   padding: 8px 14px;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   font: 600 13px/1 var(--font-body);
   color: var(--ink-soft);
   cursor: pointer;
@@ -2123,7 +2134,7 @@ textarea.input {
 
 .tabs__btn--active .tabs__count {
   background: var(--gold-100);
-  color: #7a5e10;
+  color: var(--amber-dark);
   border-color: var(--gold-300);
 }
 
@@ -2147,7 +2158,7 @@ textarea.input {
   gap: 12px;
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   padding: 20px 22px;
   box-shadow: var(--shadow-sm);
 }
@@ -2264,7 +2275,7 @@ textarea.input {
   width: 100%;
   max-width: 460px;
   background: #fff;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 26px;
   box-shadow: var(--shadow-lg);
   animation: pop 0.18s ease;
@@ -2308,7 +2319,7 @@ textarea.input {
   gap: 10px;
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 13px 15px;
   box-shadow: var(--shadow-lg);
   font: 500 13.5px/1.45 var(--font-body);
@@ -2351,7 +2362,7 @@ textarea.input {
   place-items: center;
   width: 52px;
   height: 52px;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   background: var(--gold-100);
   color: var(--gold-600);
 }
@@ -2387,7 +2398,7 @@ textarea.input {
   width: 100%;
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   padding: 38px;
   animation: fadeUp 0.3s ease both;
@@ -2407,7 +2418,7 @@ textarea.input {
   place-items: center;
   width: 40px;
   height: 40px;
-  border-radius: 11px;
+  border-radius: var(--radius-md);
   background: var(--gold-500);
   color: var(--navy-950);
 }
@@ -2454,10 +2465,10 @@ textarea.input {
 .setup__hint {
   background: var(--gold-50);
   border: 1px solid var(--gold-300);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 12px 14px;
   font-size: 13px;
-  color: #7a5e10;
+  color: var(--amber-dark);
 }
 
 /* ----------------------------------------------------------------------------
@@ -2629,7 +2640,7 @@ textarea.input {
   }
 
   .main {
-    padding: 22px 0 48px;
+    padding: 24px 0 48px;
   }
 
   .form-grid,
@@ -2787,7 +2798,7 @@ textarea.input {
 
   .modal {
     padding: 22px;
-    border-radius: 14px;
+    border-radius: var(--radius-md);
   }
 
   .modal__actions {
@@ -2847,7 +2858,7 @@ textarea.input {
 
   .hero-card {
     padding: 22px 18px;
-    border-radius: 14px;
+    border-radius: var(--radius-md);
   }
 
   .stats-grid {
