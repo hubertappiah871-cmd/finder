@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { ClipboardCheck, FileText, MessageSquare } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import { EmptyState, ErrorState, LoadingScreen } from '../components/Feedback'
@@ -64,6 +64,8 @@ export default function MyClaimsPage() {
     }
   }, [profile])
 
+  const location = useLocation()
+
   useEffect(() => {
     if (!profile) return
     let active = true
@@ -75,7 +77,7 @@ export default function MyClaimsPage() {
     return () => {
       active = false
     }
-  }, [profile, loadClaims, loadMessages])
+  }, [profile, loadClaims, loadMessages, location.pathname])
 
   async function markMessageRead(msg: MessageWithSender) {
     if (msg.read) return

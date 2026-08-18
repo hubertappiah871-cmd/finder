@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Search, Shield, Trash2, Users, UserX } from 'lucide-react'
+import { useLocation } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import { EmptyState, ErrorState, LoadingScreen } from '../components/Feedback'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -16,7 +17,9 @@ export default function AdminUsersPage() {
   const [removeTarget, setRemoveTarget] = useState<Profile | null>(null)
   const [removing, setRemoving] = useState(false)
 
-  async function load() {
+  const location = useLocation()
+
+  const load = useCallback(async () => {
     const { data, error: err } = await supabase
       .from('profiles')
       .select('*')
@@ -27,11 +30,19 @@ export default function AdminUsersPage() {
       return
     }
     setProfiles((data as Profile[] | null) ?? [])
-  }
+  }, [])
 
   useEffect(() => {
     void load()
-  }, [])
+  }, [load, location.pathname])
+
+  useEffect(() => {
+    function onFocus() {
+      void load()
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [load])
 
   const filtered = useMemo(() => {
     if (!profiles) return []
