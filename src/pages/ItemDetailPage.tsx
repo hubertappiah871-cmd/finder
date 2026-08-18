@@ -3,11 +3,13 @@ import { Link, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
   Calendar,
+  CheckCircle,
   CircleAlert,
   Clock,
   HandHeart,
   MapPin,
   MessageSquare,
+  PackageSearch,
   ShieldCheck,
   Tag,
   UserRound,
@@ -40,12 +42,22 @@ export default function ItemDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  // Claim form state
   const [ownerName, setOwnerName] = useState('')
   const [contactInfo, setContactInfo] = useState('')
   const [verification, setVerification] = useState('')
   const [claimBusy, setClaimBusy] = useState(false)
   const [claimError, setClaimError] = useState('')
   const [claimFieldErrors, setClaimFieldErrors] = useState<Record<string, string>>({})
+
+  // "I Found This" modal state
+  const [foundItOpen, setFoundItOpen] = useState(false)
+  const [foundItContact, setFoundItContact] = useState('')
+  const [foundItLocation, setFoundItLocation] = useState('')
+  const [foundItMessage, setFoundItMessage] = useState('')
+  const [foundItBusy, setFoundItBusy] = useState(false)
+  const [foundItErrors, setFoundItErrors] = useState<Record<string, string>>({})
+  const [foundItSent, setFoundItSent] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -72,6 +84,8 @@ export default function ItemDetailPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  // ── Claim form ──────────────────────────────────────────────────────────────
 
   function validateClaim(): boolean {
     const errs: Record<string, string> = {}
@@ -100,7 +114,6 @@ export default function ItemDetailPage() {
     if (!profile || !item) return
     if (!validateClaim()) return
 
-    // Duplicate claim check
     const { data: existingClaim } = await supabase
       .from('claims')
       .select('id')
@@ -136,6 +149,74 @@ export default function ItemDetailPage() {
     void load()
   }
 
+  // ── "I Found This" form ─────────────────────────────────────────────────────
+
+  function validateFoundIt(): boolean {
+    const errs: Record<string, string> = {}
+
+    const contact = foundItContact.trim()
+    if (!contact) {
+      errs.contact = 'Provide a phone number or email so the owner can reach you.'
+    } else if (!PHONE_RE.test(contact) && !EMAIL_RE.test(contact)) {
+      errs.contact = 'Must be a valid phone (0XXXXXXXXX) or email address.'
+    }
+
+    if (foundItLocation.trim().length < 2) {
+      errs.location = 'Where did you find it?'
+    }
+
+    setFoundItErrors(errs)
+    return Object.keys(errs).length === 0
+  }
+
+  async function submitFoundIt(e: FormEvent) {
+    e.preventDefault()
+    if (!profile || !item || !item.reported_by) return
+    if (!validateFoundIt()) return
+
+    // Don't let someone notify themselves
+    if (profile.id === item.reported_by) {
+      toast('info', 'You reported this item — no need to notify yourself.')
+      setFoundItOpen(false)
+      return
+    }
+
+    setFoundItBusy(true)
+
+    // Build the notification message
+    const finderName = profile.name
+    const contact = foundItContact.trim()
+    const location = foundItLocation.trim()
+    const msg = foundItMessage.trim()
+
+    let notification = `${finderName} found your lost "${item.title}"!`
+    notification += ` They found it at: ${location}.`
+    notification += ` Contact them at: ${contact}.`
+    if (msg) {
+      notification += ` Message: ${msg}`
+    }
+
+    const { error: err } = await supabase.from('notifications').insert({
+      user_id: item.reported_by,
+      message: notification,
+    })
+
+    setFoundItBusy(false)
+    if (err) {
+      toast('error', 'Could not send notification. Please try again.')
+      return
+    }
+
+    setFoundItSent(true)
+    toast('success', 'The item owner has been notified!')
+    setFoundItContact('')
+    setFoundItLocation('')
+    setFoundItMessage('')
+    setFoundItErrors({})
+  }
+
+  // ── Derived state ───────────────────────────────────────────────────────────
+
   if (loading) return <LoadingScreen label="Loading item…" />
   if (error || !item)
     return (
@@ -146,14 +227,26 @@ export default function ItemDetailPage() {
 
   const myClaim = profile ? claims.find((c) => c.claimant_uid === profile.id) ?? null : null
   const isAdmin = profile?.role === 'admin'
+  const isOwner = profile?.id === item.reported_by
+
+  // Can the current user claim this found item?
   const canClaim =
     item.type === 'found' &&
     item.status === 'open' &&
     profile &&
-    profile.role !== 'admin' &&
-    profile.id !== item.reported_by &&
+    !isAdmin &&
+    !isOwner &&
     !myClaim
-  const showClaims = isAdmin || myClaim || (profile && profile.id === item.reported_by)
+
+  // Can the current user report finding this lost item?
+  const canReportFound =
+    item.type === 'lost' &&
+    item.status === 'open' &&
+    profile &&
+    !isAdmin &&
+    !isOwner
+
+  const showClaims = isAdmin || myClaim || isOwner
 
   return (
     <div className="container page">
@@ -229,7 +322,9 @@ export default function ItemDetailPage() {
         </div>
       </div>
 
-      {item.status === 'open' && item.type === 'found' && !isAdmin && !myClaim && profile && profile.id === item.reported_by && (
+      {/* ── Info banners ──────────────────────────────────────────────────── */}
+
+      {item.status === 'open' && item.type === 'found' && !isAdmin && !myClaim && isOwner && (
         <div className="alert alert--info">
           <ShieldCheck size={16} aria-hidden="true" />
           You registered this found item. When someone claims it, you will be notified to verify their
@@ -252,6 +347,37 @@ export default function ItemDetailPage() {
           &amp; Found.
         </div>
       )}
+
+      {/* ── "I Found This" banner for lost items ──────────────────────────── */}
+
+      {canReportFound && (
+        <section className="card claim-card">
+          <div className="claim-card__head">
+            <span className="claim-card__icon" style={{ background: 'var(--green-bg)', color: 'var(--green)' }}>
+              <PackageSearch size={18} aria-hidden="true" />
+            </span>
+            <div>
+              <h2>Found this item?</h2>
+              <p>
+                If you have this item, let the owner know! Leave your contact details and where you
+                found it — they will be notified immediately.
+              </p>
+            </div>
+          </div>
+          <div className="form-actions" style={{ justifyContent: 'flex-start' }}>
+            <button
+              type="button"
+              className="btn btn--success"
+              onClick={() => { setFoundItOpen(true); setFoundItSent(false) }}
+            >
+              <PackageSearch size={16} aria-hidden="true" />
+              I Found This Item
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* ── "Is this yours?" claim form for found items ──────────────────── */}
 
       {canClaim && (
         <section className="card claim-card">
@@ -346,6 +472,8 @@ export default function ItemDetailPage() {
         </section>
       )}
 
+      {/* ── My claim status ───────────────────────────────────────────────── */}
+
       {myClaim && (
         <section className="card claim-card">
           <div className="claim-card__head">
@@ -371,6 +499,8 @@ export default function ItemDetailPage() {
           )}
         </section>
       )}
+
+      {/* ── Claims list (admin / reporter / claimant) ─────────────────────── */}
 
       {showClaims && (
         <section className="section">
@@ -417,6 +547,123 @@ export default function ItemDetailPage() {
             </div>
           )}
         </section>
+      )}
+
+      {/* ── "I Found This" modal ──────────────────────────────────────────── */}
+
+      {foundItOpen && (
+        <div
+          className="modal-backdrop"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !foundItBusy) setFoundItOpen(false)
+          }}
+        >
+          <div className="modal" role="dialog" aria-modal="true">
+            {foundItSent ? (
+              <>
+                <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+                  <CheckCircle size={48} style={{ color: 'var(--green)', marginBottom: '1rem' }} />
+                  <h3 className="modal__title">Owner notified!</h3>
+                  <p className="modal__message">
+                    {item.reporter?.name ?? 'The owner'} has been notified that you found their
+                    item. They will reach out to you at the contact details you provided.
+                  </p>
+                </div>
+                <div className="modal__actions">
+                  <button
+                    type="button"
+                    className="btn btn--primary"
+                    onClick={() => setFoundItOpen(false)}
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="modal__title">I Found This Item</h3>
+                <p className="modal__message">
+                  Tell <strong>{item.reporter?.name ?? 'the owner'}</strong> where you found
+                  their <strong>{item.title}</strong> and how to reach you.
+                </p>
+
+                <form className="form" onSubmit={(e) => void submitFoundIt(e)} noValidate>
+                  {foundItErrors.contact && (
+                    <div className="alert alert--error" role="alert">
+                      <CircleAlert size={16} aria-hidden="true" />
+                      {foundItErrors.contact}
+                    </div>
+                  )}
+
+                  <FormField label="Your contact info" htmlFor="found-contact" required error={foundItErrors.contact} hint="Phone (0XXXXXXXXX) or email — the owner will use this to reach you.">
+                    <input
+                      id="found-contact"
+                      className="input"
+                      type="text"
+                      placeholder="e.g. 0241234567 or name@campus.edu"
+                      value={foundItContact}
+                      onChange={(e) => {
+                        setFoundItContact(e.target.value)
+                        setFoundItErrors((prev) => {
+                          const next = { ...prev }
+                          delete next.contact
+                          return next
+                        })
+                      }}
+                    />
+                  </FormField>
+
+                  <FormField label="Where did you find it?" htmlFor="found-location" required error={foundItErrors.location}>
+                    <input
+                      id="found-location"
+                      className="input"
+                      type="text"
+                      placeholder="e.g. Main Library, 2nd floor near the window"
+                      value={foundItLocation}
+                      onChange={(e) => {
+                        setFoundItLocation(e.target.value)
+                        setFoundItErrors((prev) => {
+                          const next = { ...prev }
+                          delete next.location
+                          return next
+                        })
+                      }}
+                    />
+                  </FormField>
+
+                  <FormField label="Optional message" htmlFor="found-message" hint="Any extra details that might help the owner identify the item.">
+                    <textarea
+                      id="found-message"
+                      className="input"
+                      rows={3}
+                      placeholder="e.g. It looks exactly like the one in the photo. I left it with the library front desk."
+                      value={foundItMessage}
+                      onChange={(e) => setFoundItMessage(e.target.value)}
+                    />
+                  </FormField>
+
+                  <div className="modal__actions">
+                    <button
+                      type="button"
+                      className="btn btn--secondary"
+                      onClick={() => setFoundItOpen(false)}
+                      disabled={foundItBusy}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn btn--success"
+                      disabled={foundItBusy}
+                    >
+                      {foundItBusy ? 'Sending…' : 'Notify Owner'}
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
       )}
     </div>
   )
