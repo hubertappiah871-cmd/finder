@@ -32,10 +32,8 @@ export default function AdminClaimsPage() {
   const [error, setError] = useState('')
   const [tab, setTab] = useState<Tab>('pending')
 
-  // Compare view state
   const [compareItemId, setCompareItemId] = useState<string | null>(null)
 
-  // Messaging state
   const [messagingClaim, setMessagingClaim] = useState<ClaimWithRelations | null>(null)
   const [messages, setMessages] = useState<MessageWithSender[]>([])
   const [messageBody, setMessageBody] = useState('')
@@ -58,7 +56,6 @@ export default function AdminClaimsPage() {
     void load()
   }, [load])
 
-  // Auto-refresh when the window regains focus
   useEffect(() => {
     function onFocus() {
       void load()
@@ -84,7 +81,6 @@ export default function AdminClaimsPage() {
     return tab === 'all' ? claims : claims.filter((c) => c.status === tab)
   }, [claims, tab])
 
-  // Group pending claims by item for compare view
   const multiClaimItems = useMemo(() => {
     if (!claims) return []
     const pending = claims.filter((c) => c.status === 'pending' || c.status === 'meeting_required')
@@ -109,7 +105,6 @@ export default function AdminClaimsPage() {
     return compareClaims.length > 0 ? compareClaims[0].item ?? null : null
   }, [compareClaims])
 
-  // Load messages for a claim
   async function loadMessages(claimId: string) {
     const { data, error: err } = await supabase
       .from('messages')
@@ -119,7 +114,7 @@ export default function AdminClaimsPage() {
       .limit(50)
     if (err) {
       console.error('Failed to load messages:', err.message)
-      toast('error', 'Could not load messages. Make sure the migration SQL has been run in Supabase.')
+      toast('error', `Could not load messages: ${err.message}`)
       setMessages([])
       return
     }
@@ -175,7 +170,6 @@ export default function AdminClaimsPage() {
         subtitle="Compare each claim against the original listing, then approve or reject it."
       />
 
-      {/* Multi-claimant compare alerts */}
       {multiClaimItems.length > 0 && (
         <div className="alert alert--info" style={{ marginBottom: '1rem' }}>
           <strong>{multiClaimItems.length} item(s) have multiple claimants</strong>
@@ -185,7 +179,7 @@ export default function AdminClaimsPage() {
               key={itemId}
               type="button"
               className="btn btn--small btn--secondary"
-              style={{ marginLeft: '0.5rem' }}
+              style={{ marginLeft: '0.5rem', marginTop: '0.5rem' }}
               onClick={() => setCompareItemId(compareItemId === itemId ? null : itemId)}
             >
               {cs[0].item?.title ?? 'Item'} ({cs.length} claims)
@@ -194,16 +188,15 @@ export default function AdminClaimsPage() {
         </div>
       )}
 
-      {/* Compare claims view */}
       {compareItemId && compareClaims.length > 0 && (
         <section className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
-          <div className="section__head">
+          <div className="section__head" style={{ flexWrap: 'wrap' }}>
             <h2>Compare Claims — {compareItem?.title}</h2>
             <button type="button" className="btn btn--small btn--secondary" onClick={() => setCompareItemId(null)}>
               Close
             </button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(compareClaims.length, 3)}, 1fr)`, gap: '1rem', marginTop: '1rem' }}>
+          <div className="compare-grid" style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(compareClaims.length, 3)}, 1fr)`, gap: '1rem', marginTop: '1rem' }}>
             {compareClaims.map((claim) => (
               <div key={claim.id} className="card card--soft" style={{ padding: '1rem' }}>
                 <div className="claim-row__head">
@@ -298,7 +291,6 @@ export default function AdminClaimsPage() {
                   <p className="muted">Meeting: {claim.meeting_details}</p>
                 )}
 
-                {/* Show actions for pending AND meeting_required claims */}
                 {(claim.status === 'pending' || claim.status === 'meeting_required') && (
                   <div className="claim-row__actions">
                     <ClaimDecisionButtons claim={claim} onDone={() => void load()} />
@@ -306,16 +298,14 @@ export default function AdminClaimsPage() {
                       type="button"
                       className="btn btn--small btn--secondary"
                       onClick={() => openMessaging(claim)}
-                      style={{ marginLeft: '0.5rem' }}
                     >
                       <MessageSquare size={14} aria-hidden="true" />
-                      Message Claimant
+                      Message
                     </button>
                     <button
                       type="button"
                       className="btn btn--small btn--secondary"
                       onClick={() => void shareContact(claim)}
-                      style={{ marginLeft: '0.5rem' }}
                     >
                       <Phone size={14} aria-hidden="true" />
                       Share Contact
@@ -328,7 +318,6 @@ export default function AdminClaimsPage() {
         </div>
       )}
 
-      {/* Messaging modal */}
       {messagingClaim && (
         <div
           className="modal-backdrop"
@@ -336,7 +325,7 @@ export default function AdminClaimsPage() {
             if (e.target === e.currentTarget) setMessagingClaim(null)
           }}
         >
-          <div className="modal" role="dialog" aria-modal="true" style={{ maxWidth: '500px' }}>
+          <div className="modal" role="dialog" aria-modal="true">
             <h3 className="modal__title">
               Message {messagingClaim.claimant?.name ?? 'claimant'}
             </h3>
@@ -349,7 +338,7 @@ export default function AdminClaimsPage() {
                 <p className="muted" style={{ textAlign: 'center', padding: '1rem' }}>No messages yet.</p>
               ) : (
                 messages.map((m) => (
-                  <div key={m.id} style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                  <div key={m.id} style={{ padding: '0.5rem', borderBottom: '1px solid var(--line)' }}>
                     <p style={{ fontSize: '0.85rem', fontWeight: 600 }}>
                       {m.sender?.name ?? 'Unknown'}:
                     </p>

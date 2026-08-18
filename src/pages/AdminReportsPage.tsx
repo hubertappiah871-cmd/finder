@@ -52,12 +52,10 @@ export default function AdminReportsPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
-  // Date range filtering
   const [dateStart, setDateStart] = useState('')
   const [dateEnd, setDateEnd] = useState('')
   const [dateError, setDateError] = useState('')
 
-  // Export
   const [exporting, setExporting] = useState(false)
   const manualRefreshUsed = useRef(false)
 
@@ -112,7 +110,6 @@ export default function AdminReportsPage() {
     void load()
   }, [load])
 
-  // Auto-refresh when the window regains focus (user navigates back)
   useEffect(() => {
     function onFocus() {
       void load()
@@ -128,7 +125,6 @@ export default function AdminReportsPage() {
     toast('info', 'Dashboard refreshed. Manual refresh limited to once per session.')
   }
 
-  // Date range validation
   function validateDateRange(): boolean {
     setDateError('')
     if (dateStart && dateEnd) {
@@ -140,7 +136,6 @@ export default function AdminReportsPage() {
     return true
   }
 
-  // Filter items by date range
   const filteredItems = dateStart || dateEnd
     ? items.filter((item) => {
         const itemDate = new Date(item.date)
@@ -150,7 +145,6 @@ export default function AdminReportsPage() {
       })
     : items
 
-  // Export CSV (admin only)
   function handleExport() {
     if (profile?.role !== 'admin') {
       toast('error', 'Only administrators can export data.')
@@ -213,9 +207,9 @@ export default function AdminReportsPage() {
     <div className="container page">
       <PageHeader
         title="Reports &amp; analytics"
-        subtitle="A live snapshot of platform activity — updated every time the page loads."
+        subtitle="A live snapshot of platform activity."
         actions={
-          <div className="row row--sm">
+          <div className="row row--sm" style={{ flexWrap: 'wrap' }}>
             <button
               type="button"
               className="btn btn--secondary btn--small"
@@ -241,10 +235,9 @@ export default function AdminReportsPage() {
         }
       />
 
-      {/* Date range filter */}
       <div className="card" style={{ padding: '1rem 1.5rem', marginBottom: '1.5rem' }}>
-        <div className="row row--sm" style={{ alignItems: 'flex-end', gap: '1rem' }}>
-          <div className="field" style={{ flex: 1 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', alignItems: 'flex-end' }}>
+          <div className="field">
             <label className="field__label" htmlFor="date-start">Start Date</label>
             <input
               id="date-start"
@@ -257,7 +250,7 @@ export default function AdminReportsPage() {
               }}
             />
           </div>
-          <div className="field" style={{ flex: 1 }}>
+          <div className="field">
             <label className="field__label" htmlFor="date-end">End Date</label>
             <input
               id="date-end"
