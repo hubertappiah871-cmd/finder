@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ClipboardCheck, ClipboardList, MessageSquare, Phone } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import { EmptyState, ErrorState, LoadingScreen } from '../components/Feedback'
 import { ClaimStatusBadge, TypeBadge } from '../components/StatusBadge'
@@ -38,6 +38,7 @@ export default function AdminClaimsPage() {
   const [messages, setMessages] = useState<MessageWithSender[]>([])
   const [messageBody, setMessageBody] = useState('')
   const [messageBusy, setMessageBusy] = useState(false)
+  const location = useLocation()
 
   const load = useCallback(async () => {
     const { data, error: err } = await supabase
@@ -54,7 +55,7 @@ export default function AdminClaimsPage() {
 
   useEffect(() => {
     void load()
-  }, [load])
+  }, [load, location.pathname])
 
   useEffect(() => {
     function onFocus() {
@@ -171,7 +172,7 @@ export default function AdminClaimsPage() {
       />
 
       {multiClaimItems.length > 0 && (
-        <div className="alert alert--info" style={{ marginBottom: '1rem' }}>
+        <div className="alert alert--info">
           <strong>{multiClaimItems.length} item(s) have multiple claimants</strong>
           <span style={{ marginLeft: '0.5rem' }}>— compare claims to decide.</span>
           {multiClaimItems.map(([itemId, cs]) => (
@@ -189,16 +190,16 @@ export default function AdminClaimsPage() {
       )}
 
       {compareItemId && compareClaims.length > 0 && (
-        <section className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
-          <div className="section__head" style={{ flexWrap: 'wrap' }}>
+        <section className="card report-section">
+          <div className="section__head">
             <h2>Compare Claims — {compareItem?.title}</h2>
             <button type="button" className="btn btn--small btn--secondary" onClick={() => setCompareItemId(null)}>
               Close
             </button>
           </div>
-          <div className="compare-grid" style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(compareClaims.length, 3)}, 1fr)`, gap: '1rem', marginTop: '1rem' }}>
+          <div className="compare-grid">
             {compareClaims.map((claim) => (
-              <div key={claim.id} className="card card--soft" style={{ padding: '1rem' }}>
+              <div key={claim.id} className="card card--soft compare-card">
                 <div className="claim-row__head">
                   <strong>{claim.claimant?.name ?? 'Unknown'}</strong>
                   <ClaimStatusBadge status={claim.status} />
@@ -211,7 +212,7 @@ export default function AdminClaimsPage() {
                 {claim.status === 'meeting_required' && claim.meeting_details && (
                   <p className="muted">Meeting: {claim.meeting_details}</p>
                 )}
-                <div className="claim-row__actions" style={{ marginTop: '0.75rem' }}>
+                <div className="claim-row__actions compare-card__actions">
                   <ClaimDecisionButtons claim={claim} onDone={() => { void load(); setCompareItemId(null); }} />
                 </div>
               </div>
@@ -333,17 +334,17 @@ export default function AdminClaimsPage() {
               Regarding claim for "{messagingClaim.item?.title ?? 'item'}"
             </p>
 
-            <div style={{ maxHeight: '300px', overflowY: 'auto', marginBottom: '1rem' }}>
+            <div className="msg-thread">
               {messages.length === 0 ? (
-                <p className="muted" style={{ textAlign: 'center', padding: '1rem' }}>No messages yet.</p>
+                <p className="muted msg-empty">No messages yet.</p>
               ) : (
                 messages.map((m) => (
-                  <div key={m.id} style={{ padding: '0.5rem', borderBottom: '1px solid var(--line)' }}>
-                    <p style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                  <div key={m.id} className="msg-item">
+                    <p className="msg-item__name">
                       {m.sender?.name ?? 'Unknown'}:
                     </p>
-                    <p style={{ fontSize: '0.9rem' }}>{m.body}</p>
-                    <p className="muted" style={{ fontSize: '0.75rem' }}>{timeAgo(m.created_at)}</p>
+                    <p className="msg-item__body">{m.body}</p>
+                    <p className="muted msg-item__time">{timeAgo(m.created_at)}</p>
                   </div>
                 ))
               )}

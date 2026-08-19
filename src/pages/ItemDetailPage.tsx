@@ -353,7 +353,7 @@ export default function ItemDetailPage() {
       {canReportFound && (
         <section className="card claim-card">
           <div className="claim-card__head">
-            <span className="claim-card__icon" style={{ background: 'var(--green-bg)', color: 'var(--green)' }}>
+            <span className="claim-card__icon found-it-icon">
               <PackageSearch size={18} aria-hidden="true" />
             </span>
             <div>
@@ -364,7 +364,7 @@ export default function ItemDetailPage() {
               </p>
             </div>
           </div>
-          <div className="form-actions" style={{ justifyContent: 'flex-start' }}>
+          <div className="form-actions found-it-actions">
             <button
               type="button"
               className="btn btn--success"
@@ -495,7 +495,7 @@ export default function ItemDetailPage() {
           </div>
           <blockquote className="claim-verification">"{myClaim.verification_details}"</blockquote>
           {myClaim.owner_name && (
-            <p className="muted" style={{ marginTop: '0.5rem' }}>Name: {myClaim.owner_name} · Contact: {myClaim.contact_info}</p>
+            <p className="muted claim-details">Name: {myClaim.owner_name} · Contact: {myClaim.contact_info}</p>
           )}
         </section>
       )}
@@ -561,8 +561,8 @@ export default function ItemDetailPage() {
           <div className="modal" role="dialog" aria-modal="true">
             {foundItSent ? (
               <>
-                <div style={{ textAlign: 'center', padding: '1rem 0' }}>
-                  <CheckCircle size={48} style={{ color: 'var(--green)', marginBottom: '1rem' }} />
+                <div className="modal-success">
+                  <CheckCircle size={48} className="modal-success__icon" />
                   <h3 className="modal__title">Owner notified!</h3>
                   <p className="modal__message">
                     {item.reporter?.name ?? 'The owner'} has been notified that you found their

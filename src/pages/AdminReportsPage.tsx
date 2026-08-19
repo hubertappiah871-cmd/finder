@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
   BadgeCheck,
   ClipboardCheck,
@@ -58,6 +59,7 @@ export default function AdminReportsPage() {
 
   const [exporting, setExporting] = useState(false)
   const manualRefreshUsed = useRef(false)
+  const location = useLocation()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -108,7 +110,7 @@ export default function AdminReportsPage() {
 
   useEffect(() => {
     void load()
-  }, [load])
+  }, [load, location.pathname])
 
   useEffect(() => {
     function onFocus() {
@@ -209,7 +211,7 @@ export default function AdminReportsPage() {
         title="Reports &amp; analytics"
         subtitle="A live snapshot of platform activity."
         actions={
-          <div className="row row--sm" style={{ flexWrap: 'wrap' }}>
+          <div className="row row--sm row--wrap">
             <button
               type="button"
               className="btn btn--secondary btn--small"
@@ -235,8 +237,8 @@ export default function AdminReportsPage() {
         }
       />
 
-      <div className="card" style={{ padding: '1rem 1.5rem', marginBottom: '1.5rem' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', alignItems: 'flex-end' }}>
+      <div className="card date-filter">
+        <div className="date-filter__grid">
           <div className="field">
             <label className="field__label" htmlFor="date-start">Start Date</label>
             <input
@@ -273,7 +275,7 @@ export default function AdminReportsPage() {
             </button>
           )}
         </div>
-        {dateError && <p className="field__error" style={{ marginTop: '0.5rem' }}>{dateError}</p>}
+        {dateError && <p className="field__error date-filter__error">{dateError}</p>}
       </div>
 
       {error ? (
