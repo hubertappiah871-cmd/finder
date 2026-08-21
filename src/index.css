@@ -70,6 +70,113 @@
   --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
 }
 
+/* ----------------------------------------------------------------------------
+   Dark Theme Overrides
+   ------------------------------------------------------------------------- */
+[data-theme="dark"] {
+  --navy-950: #040c17;
+  --navy-900: #081628;
+  --navy-800: #0e233d;
+  --navy-700: #153357;
+  --navy-600: #1d4575;
+
+  --gold-600: #e0b638;
+  --gold-500: #eec84e;
+  --gold-400: #f7db7d;
+  --gold-300: #fae7a8;
+  --gold-100: #332805;
+  --gold-50: #1f1803;
+
+  --cream-200: #1a283b;
+  --cream-100: #102035;
+  --cream-50: #091322;
+  --ink: #f1f5f9;
+  --ink-soft: #cbd5e1;
+  --muted: #94a3b8;
+  --line: #1e3552;
+  --line-strong: #2a476d;
+  --navy-light: #162b46;
+  --placeholder: #64748b;
+
+  --green-bg: #072a1d;
+  --blue-bg: #0c2045;
+  --red-bg: #3b120c;
+  --amber-bg: #352504;
+}
+
+[data-theme="dark"] body {
+  background: var(--cream-50);
+  color: var(--ink);
+}
+
+[data-theme="dark"] .card,
+[data-theme="dark"] .table-wrap,
+[data-theme="dark"] .stat-card,
+[data-theme="dark"] .notification,
+[data-theme="dark"] .claim-row,
+[data-theme="dark"] .claim-card-row,
+[data-theme="dark"] .claim-card-row-wrapper,
+[data-theme="dark"] .search-bar,
+[data-theme="dark"] .modal,
+[data-theme="dark"] .bar-list,
+[data-theme="dark"] .detail-meta,
+[data-theme="dark"] .auth__card,
+[data-theme="dark"] .setup__card,
+[data-theme="dark"] .toast,
+[data-theme="dark"] .chat-bubble--them,
+[data-theme="dark"] .chat-modal__footer {
+  background: #0d1e33;
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+[data-theme="dark"] .card--soft,
+[data-theme="dark"] .chat-modal__body,
+[data-theme="dark"] .claim-verification,
+[data-theme="dark"] .segmented,
+[data-theme="dark"] .tabs,
+[data-theme="dark"] .claim-card-actions,
+[data-theme="dark"] .detail-media,
+[data-theme="dark"] .table th,
+[data-theme="dark"] .filter-panel,
+[data-theme="dark"] .photo-upload__dropzone {
+  background: #081628;
+  border-color: var(--line);
+}
+
+[data-theme="dark"] .input {
+  background: #071526;
+  border-color: var(--line-strong);
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .input:focus {
+  background: #091a30;
+  border-color: var(--gold-500);
+}
+
+[data-theme="dark"] .btn--secondary {
+  background: #0d1e33;
+  border-color: var(--line-strong);
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .btn--secondary:hover:not(:disabled) {
+  background: #152b47;
+  border-color: var(--gold-500);
+  color: #fff;
+}
+
+[data-theme="dark"] .segmented__btn--active,
+[data-theme="dark"] .tabs__btn--active {
+  background: #152b47;
+  color: var(--gold-300);
+}
+
+[data-theme="dark"] .navbar {
+  border-bottom-color: var(--gold-500);
+}
+
 *,
 *::before,
 *::after {
@@ -87,6 +194,7 @@ body {
   background: var(--cream-50);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  transition: background-color 0.25s var(--ease-out), color 0.25s var(--ease-out);
 }
 
 h1,
@@ -109,6 +217,10 @@ h4 {
 }
 
 a {
+  color: var(--gold-600);
+}
+
+[data-theme="light"] a {
   color: var(--navy-700);
 }
 
@@ -1547,6 +1659,70 @@ textarea.input {
   display: flex;
   justify-content: flex-end;
   margin-top: var(--sp-md);
+}
+
+.filter-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-md);
+  animation: fadeUp 0.25s var(--ease-out) both;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  background: var(--cream-100);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  animation: badgePop 0.2s var(--ease-spring) both;
+}
+
+[data-theme="dark"] .filter-chip {
+  background: #10243d;
+  border-color: #1f3f66;
+  color: #e2e8f0;
+}
+
+.filter-chip button {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 50%;
+  padding: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.filter-chip button:hover {
+  background: var(--red-bg);
+  color: var(--red);
+}
+
+.filter-reset-btn {
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.theme-toggle {
+  color: var(--gold-300);
+}
+
+.theme-toggle:hover {
+  color: #fff;
+  transform: rotate(15deg) scale(1.05);
 }
 
 .results-count {

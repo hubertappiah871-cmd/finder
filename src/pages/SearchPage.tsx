@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { PackageSearch, Search, SearchX, SlidersHorizontal, X } from 'lucide-react'
+import { PackageSearch, RotateCcw, Search, SearchX, SlidersHorizontal, X } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import ItemCard from '../components/ItemCard'
 import { EmptyState, ErrorState, LoadingScreen } from '../components/Feedback'
@@ -29,7 +29,7 @@ const DEFAULT_FILTERS: Filters = {
 }
 
 const TYPE_OPTIONS: Array<{ value: Filters['type']; label: string }> = [
-  { value: 'all', label: 'All' },
+  { value: 'all', label: 'All Items' },
   { value: 'lost', label: 'Lost' },
   { value: 'found', label: 'Found' },
 ]
@@ -39,6 +39,15 @@ export default function SearchPage() {
   const [error, setError] = useState('')
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
   const [showFilters, setShowFilters] = useState(false)
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+
+  // Debounce search query to keep typing responsive
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedQuery(filters.q)
+    }, 200)
+    return () => clearTimeout(handler)
+  }, [filters.q])
 
   useEffect(() => {
     let active = true
@@ -63,7 +72,7 @@ export default function SearchPage() {
 
   const filtered = useMemo(() => {
     if (!items) return []
-    const q = filters.q.trim().toLowerCase()
+    const q = debouncedQuery.trim().toLowerCase()
     const location = filters.location.trim().toLowerCase()
     return items.filter((item) => {
       if (filters.type !== 'all' && item.type !== filters.type) return false
@@ -81,7 +90,7 @@ export default function SearchPage() {
       }
       return true
     })
-  }, [items, filters])
+  }, [items, filters, debouncedQuery])
 
   const hasActiveFilters =
     filters.q.trim() !== '' ||
@@ -98,8 +107,8 @@ export default function SearchPage() {
   return (
     <div className="container page">
       <PageHeader
-        title="Search the campus lost &amp; found"
-        subtitle="Browse every reported and registered item — filter by keyword, category, location and more."
+        title="Search campus lost &amp; found"
+        subtitle="Browse all reported lost and registered found items with dynamic filtering."
       />
 
       <div className="search-bar">
@@ -107,12 +116,17 @@ export default function SearchPage() {
         <input
           className="search-bar__input"
           type="search"
-          placeholder="Search by title, description, or location…"
+          placeholder="Search by title, description, category or location…"
           value={filters.q}
           onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value }))}
         />
         {filters.q && (
-          <button type="button" className="search-bar__clear" onClick={() => setFilters((f) => ({ ...f, q: '' }))} aria-label="Clear search">
+          <button
+            type="button"
+            className="search-bar__clear"
+            onClick={() => setFilters((f) => ({ ...f, q: '' }))}
+            aria-label="Clear search query"
+          >
             <X size={16} />
           </button>
         )}
@@ -138,10 +152,89 @@ export default function SearchPage() {
           onClick={() => setShowFilters((v) => !v)}
         >
           <SlidersHorizontal size={14} aria-hidden="true" />
-          Filters
-          {hasActiveFilters && <span className="filter-count">{Object.values(filters).filter((v) => v !== 'all' && v !== '').length}</span>}
+          More Filters
+          {hasActiveFilters && (
+            <span className="filter-count">
+              {Object.values(filters).filter((v) => v !== 'all' && v !== '').length}
+            </span>
+          )}
         </button>
       </div>
+
+      {/* Active filter chips */}
+      {hasActiveFilters && (
+        <div className="filter-chips">
+          {filters.type !== 'all' && (
+            <span className="filter-chip">
+              Type: {filters.type === 'lost' ? 'Lost' : 'Found'}
+              <button
+                type="button"
+                onClick={() => setFilters((f) => ({ ...f, type: 'all' }))}
+                aria-label="Remove type filter"
+              >
+                <X size={12} />
+              </button>
+            </span>
+          )}
+
+          {filters.category !== 'all' && (
+            <span className="filter-chip">
+              Category: {filters.category}
+              <button
+                type="button"
+                onClick={() => setFilters((f) => ({ ...f, category: 'all' }))}
+                aria-label="Remove category filter"
+              >
+                <X size={12} />
+              </button>
+            </span>
+          )}
+
+          {filters.status !== 'all' && (
+            <span className="filter-chip">
+              Status: {filters.status}
+              <button
+                type="button"
+                onClick={() => setFilters((f) => ({ ...f, status: 'all' }))}
+                aria-label="Remove status filter"
+              >
+                <X size={12} />
+              </button>
+            </span>
+          )}
+
+          {filters.location.trim() !== '' && (
+            <span className="filter-chip">
+              Location: “{filters.location}”
+              <button
+                type="button"
+                onClick={() => setFilters((f) => ({ ...f, location: '' }))}
+                aria-label="Remove location filter"
+              >
+                <X size={12} />
+              </button>
+            </span>
+          )}
+
+          {filters.dateFrom !== '' && (
+            <span className="filter-chip">
+              Since: {filters.dateFrom}
+              <button
+                type="button"
+                onClick={() => setFilters((f) => ({ ...f, dateFrom: '' }))}
+                aria-label="Remove date filter"
+              >
+                <X size={12} />
+              </button>
+            </span>
+          )}
+
+          <button type="button" className="btn btn--small btn--ghost filter-reset-btn" onClick={clearFilters}>
+            <RotateCcw size={12} aria-hidden="true" />
+            Reset all
+          </button>
+        </div>
+      )}
 
       {showFilters && (
         <div className="card filter-panel">
@@ -149,7 +242,12 @@ export default function SearchPage() {
             <label className="field__label" htmlFor="f-category">
               Category
             </label>
-            <select id="f-category" className="input" value={filters.category} onChange={(e) => setFilters((f) => ({ ...f, category: e.target.value }))}>
+            <select
+              id="f-category"
+              className="input"
+              value={filters.category}
+              onChange={(e) => setFilters((f) => ({ ...f, category: e.target.value }))}
+            >
               <option value="all">All categories</option>
               {CATEGORIES.map((c) => (
                 <option key={c} value={c}>
@@ -161,7 +259,12 @@ export default function SearchPage() {
             <label className="field__label" htmlFor="f-status">
               Status
             </label>
-            <select id="f-status" className="input" value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value as Filters['status'] }))}>
+            <select
+              id="f-status"
+              className="input"
+              value={filters.status}
+              onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value as Filters['status'] }))}
+            >
               <option value="all">Any status</option>
               <option value="open">Open</option>
               <option value="claimed">Claimed</option>
@@ -171,12 +274,25 @@ export default function SearchPage() {
             <label className="field__label" htmlFor="f-location">
               Location
             </label>
-            <input id="f-location" className="input" type="text" placeholder="e.g. Library" value={filters.location} onChange={(e) => setFilters((f) => ({ ...f, location: e.target.value }))} />
+            <input
+              id="f-location"
+              className="input"
+              type="text"
+              placeholder="e.g. Library, Science Bldg…"
+              value={filters.location}
+              onChange={(e) => setFilters((f) => ({ ...f, location: e.target.value }))}
+            />
 
             <label className="field__label" htmlFor="f-date">
               Lost/found on or after
             </label>
-            <input id="f-date" className="input" type="date" value={filters.dateFrom} onChange={(e) => setFilters((f) => ({ ...f, dateFrom: e.target.value }))} />
+            <input
+              id="f-date"
+              className="input"
+              type="date"
+              value={filters.dateFrom}
+              onChange={(e) => setFilters((f) => ({ ...f, dateFrom: e.target.value }))}
+            />
           </div>
           <div className="filter-panel__footer">
             <button type="button" className="btn btn--ghost btn--small" onClick={clearFilters}>

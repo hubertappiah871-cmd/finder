@@ -7,9 +7,11 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Moon,
   Package,
   PackageSearch,
   Search,
+  Sun,
   Users,
   X,
 } from 'lucide-react'
@@ -39,6 +41,7 @@ function useUnreadCount(): number {
     if (!profile) return
     const uid = profile.id
     let cancelled = false
+
     async function fetchCount() {
       const { count: c } = await supabase
         .from('notifications')
@@ -47,10 +50,30 @@ function useUnreadCount(): number {
         .eq('read', false)
       if (!cancelled) setCount(c ?? 0)
     }
+
     void fetchCount()
-    const id = window.setInterval(() => void fetchCount(), 20_000)
+
+    // Realtime channel for instantaneous notification badge updates
+    const channel = supabase
+      .channel(`user-notifications-${uid}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${uid}`,
+        },
+        () => {
+          void fetchCount()
+        },
+      )
+      .subscribe()
+
+    const id = window.setInterval(() => void fetchCount(), 30_000)
     return () => {
       cancelled = true
+      void supabase.removeChannel(channel)
       window.clearInterval(id)
     }
   }, [profile])
@@ -61,8 +84,21 @@ function useUnreadCount(): number {
 export default function Navbar() {
   const { profile, signOut } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    return (localStorage.getItem('theme') as 'light' | 'dark') || 'light'
+  })
+
   const location = useLocation()
   const unread = useUnreadCount()
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('theme', theme)
+  }, [theme])
+
+  function toggleTheme() {
+    setTheme((t) => (t === 'light' ? 'dark' : 'light'))
+  }
 
   useEffect(() => {
     setMenuOpen(false)
@@ -100,6 +136,16 @@ export default function Navbar() {
         </nav>
 
         <div className="navbar__actions">
+          <button
+            type="button"
+            className="navbar__icon-btn theme-toggle"
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            onClick={toggleTheme}
+          >
+            {theme === 'dark' ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
+          </button>
+
           <Link
             to="/notifications"
             className="navbar__bell"

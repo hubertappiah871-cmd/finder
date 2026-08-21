@@ -133,12 +133,34 @@ export default function ClaimMessagingModal({
 
   useEffect(() => {
     void loadMessages(true)
-    // Poll every 5s for new messages while modal is open
+
+    // Realtime channel for instantaneous chat delivery
+    const channel = supabase
+      .channel(`claim-messages-${claim.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messages',
+          filter: `claim_id=eq.${claim.id}`,
+        },
+        () => {
+          void loadMessages(false)
+        },
+      )
+      .subscribe()
+
+    // Fallback heartbeat poll
     const interval = setInterval(() => {
       void loadMessages(false)
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [loadMessages])
+    }, 8000)
+
+    return () => {
+      void supabase.removeChannel(channel)
+      clearInterval(interval)
+    }
+  }, [claim.id, loadMessages])
 
   useEffect(() => {
     scrollToBottom()
