@@ -3,12 +3,13 @@ import { Check, MessageSquare, Phone, Send, User, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { supabase } from '../lib/supabase'
-import type { ClaimWithRelations, MessageWithSender } from '../lib/types'
+import type { ClaimWithRelations, ItemWithReporter, MessageWithSender } from '../lib/types'
 import { cn, initials, timeAgo } from '../lib/utils'
 import { Spinner } from './Feedback'
 
 interface ClaimMessagingModalProps {
-  claim: ClaimWithRelations
+  claim?: ClaimWithRelations | null
+  item?: ItemWithReporter | null
   onClose: () => void
   onMessageSent?: () => void
   defaultRecipientId?: string
@@ -19,6 +20,7 @@ const MESSAGES_SELECT =
 
 export default function ClaimMessagingModal({
   claim,
+  item,
   onClose,
   onMessageSent,
   defaultRecipientId,
@@ -39,6 +41,10 @@ export default function ClaimMessagingModal({
   const threadEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
+  const itemTitle = claim?.item?.title || item?.title || 'Item'
+  const claimId = claim?.id ?? null
+  const itemId = item?.id ?? claim?.item?.id ?? claim?.item_id ?? null
+
   const scrollToBottom = useCallback(() => {
     threadEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
@@ -54,25 +60,31 @@ export default function ClaimMessagingModal({
         return
       }
 
-      // 2. If current user is Admin -> recipient is the claimant
-      if (profile.role === 'admin') {
-        setResolvedRecipientId(claim.claimant_uid)
-        setResolvedRecipientName(claim.claimant?.name ?? 'Claimant')
-        return
-      }
-
-      // 3. If current user is Claimant:
-      // If there's an existing message from someone else, message them back
+      // 2. If there's an existing message from someone else in this thread, message them back
       const otherMsg = [...currentMessages]
         .reverse()
         .find((m) => m.sender_id !== profile.id)
       if (otherMsg) {
         setResolvedRecipientId(otherMsg.sender_id)
-        setResolvedRecipientName(otherMsg.sender?.name ?? 'Admin / Staff')
+        setResolvedRecipientName(otherMsg.sender?.name ?? (otherMsg.sender?.role === 'admin' ? 'Campus Admin' : 'User'))
         return
       }
 
-      // 4. Otherwise, route message to an active admin
+      // 3. If current user is Admin:
+      if (profile.role === 'admin') {
+        if (claim?.claimant_uid) {
+          setResolvedRecipientId(claim.claimant_uid)
+          setResolvedRecipientName(claim.claimant?.name ?? 'Claimant')
+          return
+        }
+        if (item?.reported_by && item.reported_by !== profile.id) {
+          setResolvedRecipientId(item.reported_by)
+          setResolvedRecipientName(item.reporter?.name ?? 'Item Finder / Reporter')
+          return
+        }
+      }
+
+      // 4. If current user is a Finder or Claimant messaging an Admin:
       const { data: adminData } = await supabase
         .from('profiles')
         .select('id, name')
@@ -85,23 +97,28 @@ export default function ClaimMessagingModal({
       if (adminData) {
         setResolvedRecipientId(adminData.id)
         setResolvedRecipientName(adminData.name || 'Campus Admin')
-      } else if (claim.item?.reported_by && claim.item.reported_by !== profile.id) {
-        setResolvedRecipientId(claim.item.reported_by)
-        setResolvedRecipientName('Item Reporter')
+      } else if (item?.reported_by && item.reported_by !== profile.id) {
+        setResolvedRecipientId(item.reported_by)
+        setResolvedRecipientName(item.reporter?.name || 'Item Finder')
       }
     },
-    [profile, defaultRecipientId, claim],
+    [profile, defaultRecipientId, claim, item],
   )
 
   const loadMessages = useCallback(
     async (showLoading = false) => {
-      if (!claim.id || !profile) return
+      if (!profile || (!claimId && !itemId)) return
       if (showLoading) setLoading(true)
 
-      const { data, error } = await supabase
-        .from('messages')
-        .select(MESSAGES_SELECT)
-        .eq('claim_id', claim.id)
+      let query = supabase.from('messages').select(MESSAGES_SELECT)
+
+      if (claimId) {
+        query = query.eq('claim_id', claimId)
+      } else if (itemId) {
+        query = query.eq('item_id', itemId)
+      }
+
+      const { data, error } = await query
         .order('created_at', { ascending: true })
         .limit(100)
 
@@ -128,22 +145,25 @@ export default function ClaimMessagingModal({
           .in('id', unreadIds)
       }
     },
-    [claim.id, profile, resolveRecipient],
+    [claimId, itemId, profile, resolveRecipient],
   )
 
   useEffect(() => {
     void loadMessages(true)
 
+    const channelFilter = claimId ? `claim_id=eq.${claimId}` : `item_id=eq.${itemId}`
+    const channelName = claimId ? `claim-messages-${claimId}` : `item-messages-${itemId}`
+
     // Realtime channel for instantaneous chat delivery
     const channel = supabase
-      .channel(`claim-messages-${claim.id}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'messages',
-          filter: `claim_id=eq.${claim.id}`,
+          filter: channelFilter,
         },
         () => {
           void loadMessages(false)
@@ -160,7 +180,7 @@ export default function ClaimMessagingModal({
       void supabase.removeChannel(channel)
       clearInterval(interval)
     }
-  }, [claim.id, loadMessages])
+  }, [claimId, itemId, loadMessages])
 
   useEffect(() => {
     scrollToBottom()
@@ -172,7 +192,7 @@ export default function ClaimMessagingModal({
 
   async function handleSendMessage() {
     const text = body.trim()
-    if (!text || !profile || !claim.id || sending) return
+    if (!text || !profile || (!claimId && !itemId) || sending) return
 
     let targetRecipient = resolvedRecipientId
 
@@ -194,12 +214,25 @@ export default function ClaimMessagingModal({
     }
 
     setSending(true)
-    const { error } = await supabase.from('messages').insert({
-      claim_id: claim.id,
+    const payload: {
+      claim_id?: string | null
+      item_id?: string | null
+      sender_id: string
+      recipient_id: string
+      body: string
+    } = {
       sender_id: profile.id,
       recipient_id: targetRecipient,
       body: text,
-    })
+    }
+
+    if (claimId) {
+      payload.claim_id = claimId
+    } else if (itemId) {
+      payload.item_id = itemId
+    }
+
+    const { error } = await supabase.from('messages').insert(payload)
     setSending(false)
 
     if (error) {
@@ -216,10 +249,10 @@ export default function ClaimMessagingModal({
   }
 
   async function handleShareContact() {
-    if (!profile || !claim.id || sharingContact) return
+    if (!profile || (!claimId && !itemId) || sharingContact) return
     setSharingContact(true)
 
-    const contactText = `My contact details: ${profile.name} (${profile.email}). Please use this to coordinate regarding this claim.`
+    const contactText = `My contact details: ${profile.name} (${profile.email}). Please use this to coordinate regarding this item.`
     let targetRecipient = resolvedRecipientId
 
     if (!targetRecipient) {
@@ -239,12 +272,25 @@ export default function ClaimMessagingModal({
       return
     }
 
-    const { error } = await supabase.from('messages').insert({
-      claim_id: claim.id,
+    const payload: {
+      claim_id?: string | null
+      item_id?: string | null
+      sender_id: string
+      recipient_id: string
+      body: string
+    } = {
       sender_id: profile.id,
       recipient_id: targetRecipient,
       body: contactText,
-    })
+    }
+
+    if (claimId) {
+      payload.claim_id = claimId
+    } else if (itemId) {
+      payload.item_id = itemId
+    }
+
+    const { error } = await supabase.from('messages').insert(payload)
     setSharingContact(false)
 
     if (error) {
@@ -266,8 +312,8 @@ export default function ClaimMessagingModal({
 
   const otherPartyTitle =
     profile?.role === 'admin'
-      ? claim.claimant?.name || 'Claimant'
-      : resolvedRecipientName || 'Admin / Campus Team'
+      ? (resolvedRecipientName || claim?.claimant?.name || item?.reporter?.name || 'User')
+      : (resolvedRecipientName || 'Campus Admin')
 
   return (
     <div
@@ -292,7 +338,7 @@ export default function ClaimMessagingModal({
                 Conversation with {otherPartyTitle}
               </h3>
               <p className="chat-modal__subtitle">
-                Regarding item: <strong>{claim.item?.title ?? 'Claimed Item'}</strong>
+                Regarding item: <strong>{itemTitle}</strong>
               </p>
             </div>
           </div>
@@ -319,8 +365,8 @@ export default function ClaimMessagingModal({
               </span>
               <h4>No messages yet</h4>
               <p>
-                Start the conversation regarding this claim. All messages are securely delivered
-                in-app.
+                Send a message regarding this item. All messages are securely delivered
+                in real time.
               </p>
             </div>
           ) : (

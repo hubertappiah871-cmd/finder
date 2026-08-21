@@ -62,7 +62,8 @@ create table if not exists public.claims (
 
 create table if not exists public.messages (
   id uuid primary key default gen_random_uuid(),
-  claim_id uuid not null references public.claims (id) on delete cascade,
+  claim_id uuid references public.claims (id) on delete cascade,
+  item_id uuid references public.items (id) on delete cascade,
   sender_id uuid not null references public.profiles (id) on delete cascade,
   recipient_id uuid not null references public.profiles (id) on delete cascade,
   body text not null,
@@ -529,7 +530,7 @@ create trigger items_notify_resolved
   after update on public.items
   for each row execute function public.notify_item_resolved();
 
--- New message → notify recipient with sender name and claim info
+-- New message → notify recipient with sender name and item/claim info
 create or replace function public.notify_new_message()
 returns trigger
 language plpgsql
@@ -538,20 +539,24 @@ set search_path = public
 as $$
 declare
   sender_name text;
-  claim_item_title text;
+  v_title text;
 begin
   select name into sender_name from public.profiles where id = new.sender_id;
 
-  select i.title into claim_item_title
-  from public.claims c
-  join public.items i on i.id = c.item_id
-  where c.id = new.claim_id;
+  if new.item_id is not null then
+    select title into v_title from public.items where id = new.item_id;
+  elsif new.claim_id is not null then
+    select i.title into v_title
+    from public.claims c
+    join public.items i on i.id = c.item_id
+    where c.id = new.claim_id;
+  end if;
 
   insert into public.notifications (user_id, message)
   values (
     new.recipient_id,
     coalesce(sender_name, 'A user') || ' sent you a message'
-      || case when claim_item_title is not null then ' regarding “' || claim_item_title || '”' else '' end
+      || case when v_title is not null then ' regarding “' || v_title || '”' else '' end
       || ': “' || case when length(new.body) > 60 then substr(new.body, 1, 57) || '…' else new.body end || '”'
   );
   return new;

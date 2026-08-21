@@ -43,6 +43,7 @@ export default function ItemDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeMessagingClaim, setActiveMessagingClaim] = useState<ClaimWithRelations | null>(null)
+  const [messagingItem, setMessagingItem] = useState<ItemWithReporter | null>(null)
 
   // Claim form state
   const [ownerName, setOwnerName] = useState('')
@@ -337,13 +338,58 @@ export default function ItemDetailPage() {
         </div>
       </div>
 
-      {/* ── Info banners ──────────────────────────────────────────────────── */}
+      {/* ── Info banners & Actions ────────────────────────────────────────── */}
 
-      {item.status === 'open' && item.type === 'found' && !isAdmin && !myClaim && isOwner && (
-        <div className="alert alert--info">
-          <ShieldCheck size={16} aria-hidden="true" />
-          You registered this found item. When someone claims it, you will be notified to verify their
-          description.
+      {item.status === 'open' && item.type === 'found' && !isAdmin && isOwner && (
+        <section className="card claim-card">
+          <div className="claim-card__head">
+            <span className="claim-card__icon found-it-icon">
+              <ShieldCheck size={18} aria-hidden="true" />
+            </span>
+            <div>
+              <h2>You registered this found item</h2>
+              <p>
+                When a student or staff claims this item, you will be notified. You can also chat directly with the campus admin team at any time.
+              </p>
+            </div>
+          </div>
+          <div className="claim-row__actions" style={{ marginTop: '0.75rem' }}>
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={() => setMessagingItem(item)}
+            >
+              <MessageSquare size={15} aria-hidden="true" />
+              Chat with Admin about this item
+            </button>
+          </div>
+        </section>
+      )}
+
+      {isAdmin && item.reported_by && (
+        <div
+          className="card"
+          style={{
+            padding: '12px 18px',
+            marginBottom: 'var(--sp-lg)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '10px',
+          }}
+        >
+          <span className="muted">
+            Reported by: <strong>{item.reporter?.name || 'User'}</strong> ({item.reporter?.email || 'No email'})
+          </span>
+          <button
+            type="button"
+            className="btn btn--small btn--secondary"
+            onClick={() => setMessagingItem(item)}
+          >
+            <MessageSquare size={14} aria-hidden="true" />
+            Message {item.type === 'found' ? 'Finder' : 'Reporter'}
+          </button>
         </div>
       )}
 
@@ -699,10 +745,14 @@ export default function ItemDetailPage() {
         </div>
       )}
 
-      {activeMessagingClaim && (
+      {(activeMessagingClaim || messagingItem) && (
         <ClaimMessagingModal
           claim={activeMessagingClaim}
-          onClose={() => setActiveMessagingClaim(null)}
+          item={messagingItem}
+          onClose={() => {
+            setActiveMessagingClaim(null)
+            setMessagingItem(null)
+          }}
         />
       )}
     </div>

@@ -7,13 +7,13 @@ import { ClaimStatusBadge, TypeBadge } from '../components/StatusBadge'
 import ClaimMessagingModal from '../components/ClaimMessagingModal'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
-import type { ClaimWithRelations, MessageWithSender } from '../lib/types'
+import type { ClaimWithRelations, ItemWithReporter, MessageWithSender } from '../lib/types'
 import { cn, timeAgo } from '../lib/utils'
 
 const CLAIMS_SELECT =
   '*, item:items!claims_item_id_fkey(id, title, type, photo_url, status, reported_by), claimant:profiles!claims_claimant_uid_fkey(name, email)'
 const MESSAGES_SELECT =
-  '*, sender:profiles!messages_sender_id_fkey(name, role), recipient:profiles!messages_recipient_id_fkey(name, role), claim:claims!messages_claim_id_fkey(id, item_id, claimant_uid, status, item:items!claims_item_id_fkey(id, title, type, photo_url, status, reported_by), claimant:profiles!claims_claimant_uid_fkey(name, email))'
+  '*, sender:profiles!messages_sender_id_fkey(name, role), recipient:profiles!messages_recipient_id_fkey(name, role), item:items!messages_item_id_fkey(id, title, type, photo_url), claim:claims!messages_claim_id_fkey(id, item_id, claimant_uid, status, item:items!claims_item_id_fkey(id, title, type, photo_url, status, reported_by), claimant:profiles!claims_claimant_uid_fkey(name, email))'
 
 type Tab = 'claims' | 'messages'
 
@@ -24,6 +24,7 @@ export default function MyClaimsPage() {
   const [error, setError] = useState('')
   const [tab, setTab] = useState<Tab>('claims')
   const [activeMessagingClaim, setActiveMessagingClaim] = useState<ClaimWithRelations | null>(null)
+  const [activeMessagingItem, setActiveMessagingItem] = useState<ItemWithReporter | null>(null)
 
   const loadClaims = useCallback(async () => {
     if (!profile) return
@@ -34,7 +35,7 @@ export default function MyClaimsPage() {
       .order('created_at', { ascending: false })
       .limit(100)
     if (err) {
-      setError('Could not load your claims.')
+      setError('Could not load claims.')
       return
     }
     setClaims((data as ClaimWithRelations[] | null) ?? [])
@@ -83,21 +84,45 @@ export default function MyClaimsPage() {
     messages?.filter((m) => m.recipient_id === profile?.id && !m.read).length ?? 0
 
   function openChatForClaim(claim: ClaimWithRelations) {
+    setActiveMessagingItem(null)
     setActiveMessagingClaim(claim)
   }
 
   function openChatForMessage(msg: MessageWithSender) {
     if (msg.claim) {
+      setActiveMessagingItem(null)
       setActiveMessagingClaim(msg.claim as ClaimWithRelations)
+      return
+    }
+    if (msg.item || msg.item_id) {
+      setActiveMessagingClaim(null)
+      setActiveMessagingItem(
+        (msg.item as ItemWithReporter) || {
+          id: msg.item_id || '',
+          title: 'Item',
+          type: 'found',
+          category: 'Other',
+          location: '',
+          date: '',
+          description: '',
+          photo_url: null,
+          status: 'open',
+          reported_by: null,
+          created_at: msg.created_at,
+          reporter: null,
+        },
+      )
       return
     }
     // If claim wasn't embedded, find from loaded claims or create minimal object
     const matched = claims?.find((c) => c.id === msg.claim_id)
     if (matched) {
+      setActiveMessagingItem(null)
       setActiveMessagingClaim(matched)
     } else {
+      setActiveMessagingItem(null)
       setActiveMessagingClaim({
-        id: msg.claim_id,
+        id: msg.claim_id || '',
         item_id: '',
         claimant_uid: profile?.id ?? '',
         owner_name: '',
@@ -254,10 +279,14 @@ export default function MyClaimsPage() {
         )
       )}
 
-      {activeMessagingClaim && (
+      {(activeMessagingClaim || activeMessagingItem) && (
         <ClaimMessagingModal
           claim={activeMessagingClaim}
-          onClose={() => setActiveMessagingClaim(null)}
+          item={activeMessagingItem}
+          onClose={() => {
+            setActiveMessagingClaim(null)
+            setActiveMessagingItem(null)
+          }}
           onMessageSent={() => void loadMessages()}
         />
       )}

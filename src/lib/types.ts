@@ -57,7 +57,8 @@ export interface ClaimWithRelations extends Claim {
 /** messages table */
 export interface Message {
   id: string
-  claim_id: string
+  claim_id: string | null
+  item_id?: string | null
   sender_id: string
   recipient_id: string
   body: string
@@ -65,10 +66,11 @@ export interface Message {
   read: boolean
 }
 
-/** Message with sender profile embedded */
+/** Message with sender profile and optional claim/item embedded */
 export interface MessageWithSender extends Message {
   sender: Pick<Profile, 'name' | 'role'> | null
   recipient?: Pick<Profile, 'name' | 'role'> | null
+  item?: Pick<Item, 'id' | 'title' | 'type' | 'photo_url'> | null
   claim?: (Pick<Claim, 'id' | 'item_id' | 'claimant_uid' | 'status'> & {
     item?: Pick<Item, 'id' | 'title' | 'type' | 'photo_url'> | null
     claimant?: Pick<Profile, 'name' | 'email'> | null
