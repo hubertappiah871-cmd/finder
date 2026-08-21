@@ -2217,6 +2217,36 @@ textarea.input {
   animation: badgePop 0.3s var(--ease-spring) both;
 }
 
+.notification__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.notif-reply-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  transition: transform 0.15s var(--ease-spring), background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.notif-reply-btn:hover {
+  transform: translateY(-1px);
+  border-color: var(--gold-500);
+  background: #fff;
+  color: var(--navy-900);
+}
+
+[data-theme="dark"] .notif-reply-btn:hover {
+  background: #142a47;
+  color: #fff;
+}
+
 .claim-card-list {
   display: flex;
   flex-direction: column;
