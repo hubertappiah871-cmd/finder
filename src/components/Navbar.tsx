@@ -140,7 +140,7 @@ export default function Navbar() {
           <input
             type="text"
             className="navbar__search-input"
-            placeholder="Search lost &amp; found items…"
+            placeholder="Search lost &amp; found…"
             value={navSearch}
             onChange={(e) => setNavSearch(e.target.value)}
           />

@@ -437,54 +437,56 @@ a {
   position: relative;
   display: flex;
   align-items: center;
-  flex: 0 1 300px;
-  margin: 0 8px;
+  flex: 1 1 220px;
+  max-width: 320px;
+  margin: 0 10px;
 }
 
 .navbar__search-icon {
   position: absolute;
   left: 12px;
-  color: #94a3b8;
+  color: #cbd5e1;
   pointer-events: none;
 }
 
 .navbar__search-input {
   width: 100%;
   height: 38px;
-  padding: 0 42px 0 34px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  padding: 0 38px 0 34px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 999px;
-  color: #ffffff;
+  color: #ffffff !important;
   font: 500 13px/1 var(--font-body);
   transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
 
 .navbar__search-input::placeholder {
-  color: #94a3b8;
+  color: #cbd5e1;
 }
 
 .navbar__search-input:focus {
   outline: none;
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.18);
   border-color: var(--gold-400);
-  box-shadow: 0 0 0 3px rgba(226, 181, 41, 0.2);
+  box-shadow: 0 0 0 3px rgba(226, 181, 41, 0.25);
 }
 
 .navbar__search-kbd {
   position: absolute;
   right: 10px;
-  font: 700 10.5px/1 monospace;
+  font: 700 10px/1 monospace;
   padding: 2px 5px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.12);
-  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
   pointer-events: none;
 }
 
 .navbar__links {
   display: flex;
-  gap: 4px;
+  align-items: center;
+  gap: 6px;
   margin-left: auto;
 }
 
@@ -492,24 +494,40 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  color: #e2e8f0;
+  color: #ffffff !important;
   font: 600 13.5px/1 var(--font-body);
-  text-decoration: none;
-  padding: 8px 12px;
+  text-decoration: none !important;
+  padding: 8px 14px;
   border-radius: var(--radius-md);
-  border-bottom: 2px solid transparent;
-  transition: color 0.2s, background 0.2s, border-color 0.2s;
+  border: 1.5px solid transparent;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.navbar__link svg {
+  color: #ffffff !important;
+  flex-shrink: 0;
 }
 
 .navbar__link:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.16) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+.navbar__link:hover svg {
+  color: #ffffff !important;
 }
 
 .navbar__link--active {
-  color: #ffffff;
-  background: rgba(201, 162, 39, 0.24);
-  border-bottom-color: var(--gold-400);
+  color: #071d34 !important;
+  background: var(--gold-500) !important;
+  border-color: var(--gold-400) !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 8px rgba(226, 181, 41, 0.4) !important;
+}
+
+.navbar__link--active svg {
+  color: #071d34 !important;
 }
 
 .navbar__actions {
@@ -521,7 +539,7 @@ a {
 .navbar__user-divider {
   width: 1px;
   height: 24px;
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.25);
   margin: 0 4px;
 }
 
@@ -532,30 +550,37 @@ a {
   width: 38px;
   height: 38px;
   border-radius: var(--radius-md);
-  color: #e2e8f0;
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  text-decoration: none !important;
   transition: background 0.2s, color 0.2s, transform 0.2s var(--ease-spring);
 }
 
+.navbar__bell svg {
+  color: #ffffff !important;
+}
+
 .navbar__bell:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff !important;
   transform: rotate(12deg);
 }
 
 .navbar__badge {
   position: absolute;
-  top: 2px;
-  right: -1px;
+  top: -2px;
+  right: -2px;
   min-width: 18px;
   height: 18px;
   padding: 0 4px;
   display: grid;
   place-items: center;
   background: var(--gold-500);
-  color: #040c17;
+  color: #071d34;
   font: 800 11px/1 var(--font-body);
   border-radius: 999px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
   animation: badgePop 0.3s var(--ease-spring) both;
 }
 
@@ -571,8 +596,8 @@ a {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: var(--navy-700);
-  color: #ffffff;
+  background: var(--navy-800);
+  color: #ffffff !important;
   font: 700 12px/1 var(--font-body);
   border: 1.5px solid var(--gold-400);
   transition: border-color 0.2s, transform 0.2s var(--ease-spring);
@@ -590,12 +615,12 @@ a {
 }
 
 .navbar__user-name {
-  color: #ffffff;
-  font: 600 13.5px/1.2 var(--font-body);
+  color: #ffffff !important;
+  font: 700 13.5px/1.2 var(--font-body);
 }
 
 .navbar__user-role {
-  color: var(--gold-300);
+  color: var(--gold-300) !important;
   font: 600 11px/1 var(--font-body);
 }
 
@@ -606,15 +631,19 @@ a {
   height: 38px;
   border-radius: var(--radius-md);
   border: 1px solid rgba(255, 255, 255, 0.25);
-  background: transparent;
-  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff !important;
   cursor: pointer;
   transition: background 0.2s, color 0.2s, transform 0.2s var(--ease-spring);
 }
 
+.navbar__icon-btn svg {
+  color: #ffffff !important;
+}
+
 .navbar__icon-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff !important;
   transform: scale(1.06);
 }
 
