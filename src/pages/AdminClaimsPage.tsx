@@ -281,6 +281,7 @@ export default function AdminClaimsPage() {
       {messagingClaim && (
         <ClaimMessagingModal
           claim={messagingClaim}
+          defaultRecipientId={messagingClaim.claimant_uid}
           onClose={() => setMessagingClaim(null)}
         />
       )}

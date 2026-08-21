@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { ClipboardCheck, FileText, MessageSquare, Send } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
@@ -16,6 +16,18 @@ const MESSAGES_SELECT =
   '*, sender:profiles!messages_sender_id_fkey(name, role), recipient:profiles!messages_recipient_id_fkey(name, role), item:items!messages_item_id_fkey(id, title, type, photo_url), claim:claims!messages_claim_id_fkey(id, item_id, claimant_uid, status, item:items!claims_item_id_fkey(id, title, type, photo_url, status, reported_by), claimant:profiles!claims_claimant_uid_fkey(name, email))'
 
 type Tab = 'claims' | 'messages'
+
+interface ConversationThread {
+  id: string
+  lastMessage: MessageWithSender
+  unreadCount: number
+  otherUserId: string
+  otherUserName: string
+  otherUserRole?: string
+  itemTitle: string
+  claim?: ClaimWithRelations | null
+  item?: ItemWithReporter | null
+}
 
 export default function MyClaimsPage() {
   const { profile } = useAuth()
@@ -35,6 +47,7 @@ export default function MyClaimsPage() {
       .eq('claimant_uid', profile.id)
       .order('created_at', { ascending: false })
       .limit(100)
+
     if (err) {
       setError('Could not load claims.')
       return
@@ -52,7 +65,6 @@ export default function MyClaimsPage() {
       .limit(100)
 
     if (err) {
-      console.error('Could not load messages:', err.message)
       // Fallback query in case foreign key path differs
       const { data: fallbackData } = await supabase
         .from('messages')
@@ -84,27 +96,70 @@ export default function MyClaimsPage() {
   const unreadCount =
     messages?.filter((m) => m.recipient_id === profile?.id && !m.read).length ?? 0
 
+  // Group individual message rows into distinct conversation threads
+  const threads = useMemo<ConversationThread[]>(() => {
+    if (!messages || !profile) return []
+
+    const map = new Map<string, ConversationThread>()
+
+    for (const m of messages) {
+      const isMe = m.sender_id === profile.id
+      const otherUserId = isMe ? m.recipient_id : m.sender_id
+      const otherUserName = isMe
+        ? m.recipient?.name || (m.recipient?.role === 'admin' ? 'Campus Admin' : 'User')
+        : m.sender?.name || (m.sender?.role === 'admin' ? 'Campus Admin' : 'User')
+      const otherUserRole = isMe ? m.recipient?.role : m.sender?.role
+
+      const threadKey = m.claim_id
+        ? `claim_${m.claim_id}`
+        : m.item_id
+        ? `item_${m.item_id}_${otherUserId}`
+        : `direct_${otherUserId}`
+
+      const itemTitle = m.claim?.item?.title || m.item?.title || 'Item'
+
+      if (!map.has(threadKey)) {
+        map.set(threadKey, {
+          id: threadKey,
+          lastMessage: m,
+          unreadCount: !isMe && !m.read ? 1 : 0,
+          otherUserId,
+          otherUserName,
+          otherUserRole,
+          itemTitle,
+          claim: (m.claim as ClaimWithRelations) || null,
+          item: (m.item as ItemWithReporter) || null,
+        })
+      } else {
+        const entry = map.get(threadKey)!
+        if (!isMe && !m.read) {
+          entry.unreadCount += 1
+        }
+      }
+    }
+
+    return Array.from(map.values())
+  }, [messages, profile])
+
   function openChatForClaim(claim: ClaimWithRelations) {
     setActiveMessagingItem(null)
-    setActiveRecipientId(undefined)
+    setActiveRecipientId(profile?.role === 'admin' ? claim.claimant_uid : undefined)
     setActiveMessagingClaim(claim)
   }
 
-  function openChatForMessage(msg: MessageWithSender) {
-    const otherUserId = msg.sender_id === profile?.id ? msg.recipient_id : msg.sender_id
-    setActiveRecipientId(otherUserId)
-
-    if (msg.claim) {
+  function openChatForThread(thread: ConversationThread) {
+    setActiveRecipientId(thread.otherUserId)
+    if (thread.claim) {
       setActiveMessagingItem(null)
-      setActiveMessagingClaim(msg.claim as ClaimWithRelations)
+      setActiveMessagingClaim(thread.claim)
       return
     }
-    if (msg.item || msg.item_id) {
+    if (thread.item || thread.lastMessage.item_id) {
       setActiveMessagingClaim(null)
       setActiveMessagingItem(
-        (msg.item as ItemWithReporter) || {
-          id: msg.item_id || '',
-          title: 'Item',
+        thread.item || {
+          id: thread.lastMessage.item_id || '',
+          title: thread.itemTitle,
           type: 'found',
           category: 'Other',
           location: '',
@@ -112,22 +167,21 @@ export default function MyClaimsPage() {
           description: '',
           photo_url: null,
           status: 'open',
-          reported_by: null,
-          created_at: msg.created_at,
+          reported_by: thread.otherUserId,
+          created_at: thread.lastMessage.created_at,
           reporter: null,
         },
       )
       return
     }
-    // If claim wasn't embedded, find from loaded claims or create minimal object
-    const matched = claims?.find((c) => c.id === msg.claim_id)
+    const matched = claims?.find((c) => c.id === thread.lastMessage.claim_id)
     if (matched) {
       setActiveMessagingItem(null)
       setActiveMessagingClaim(matched)
     } else {
       setActiveMessagingItem(null)
       setActiveMessagingClaim({
-        id: msg.claim_id || '',
+        id: thread.lastMessage.claim_id || '',
         item_id: '',
         claimant_uid: profile?.id ?? '',
         owner_name: '',
@@ -137,7 +191,7 @@ export default function MyClaimsPage() {
         rejection_reason: null,
         admin_notes: null,
         meeting_details: null,
-        created_at: msg.created_at,
+        created_at: thread.lastMessage.created_at,
         item: null,
         claimant: { name: profile?.name ?? 'Me', email: profile?.email ?? '' },
       })
@@ -147,31 +201,37 @@ export default function MyClaimsPage() {
   return (
     <div className="container page">
       <PageHeader
-        title="My claims"
-        subtitle="Track every item you have claimed, message staff/admin, and resolve handovers."
+        title="My claims &amp; messages"
+        subtitle="Track verification status, view admin feedback, and coordinate handovers in real time."
       />
 
-      <div className="tabs">
+      {/* Tabs */}
+      <div className="tabs" role="tablist" style={{ marginBottom: 'var(--sp-lg)' }}>
         <button
           type="button"
+          role="tab"
+          aria-selected={tab === 'claims'}
           className={cn('tabs__btn', tab === 'claims' && 'tabs__btn--active')}
           onClick={() => setTab('claims')}
         >
-          Claims
-          <span className="tabs__count">{claims?.length ?? 0}</span>
+          <FileText size={15} aria-hidden="true" />
+          My Claims ({claims?.length ?? 0})
         </button>
         <button
           type="button"
+          role="tab"
+          aria-selected={tab === 'messages'}
           className={cn('tabs__btn', tab === 'messages' && 'tabs__btn--active')}
           onClick={() => setTab('messages')}
         >
-          Messages
-          {unreadCount > 0 && <span className="tabs__count tabs__count--unread">{unreadCount}</span>}
+          <MessageSquare size={15} aria-hidden="true" />
+          Conversations ({threads.length})
+          {unreadCount > 0 && <span className="filter-count">{unreadCount}</span>}
         </button>
       </div>
 
       {error ? (
-        <ErrorState message={error} onRetry={() => window.location.reload()} />
+        <ErrorState message={error} onRetry={() => void loadClaims()} />
       ) : tab === 'claims' ? (
         !claims ? (
           <LoadingScreen label="Loading your claims…" />
@@ -179,38 +239,81 @@ export default function MyClaimsPage() {
           <EmptyState
             icon={ClipboardCheck}
             title="No claims yet"
-            message="When you find a lost item that belongs to you, submit a claim with proof of ownership and it will appear here."
+            message="When you submit a claim on a found item, it will show up here along with review updates."
+            action={
+              <Link to="/search" className="btn btn--primary">
+                Search found items
+              </Link>
+            }
           />
         ) : (
-          <div className="claim-card-list">
+          <div className="claim-cards">
             {claims.map((claim) => (
-              <div key={claim.id} className="claim-card-row-wrapper">
-                <Link to={`/items/${claim.item_id}`} className="claim-card-row">
-                  <span className="claim-card-row__thumb">
-                    {claim.item?.photo_url ? (
-                      <img src={claim.item.photo_url} alt="" />
+              <div key={claim.id} className="card claim-card-row">
+                {claim.item?.photo_url ? (
+                  <img
+                    src={claim.item.photo_url}
+                    alt={claim.item.title}
+                    className="claim-card-row__thumb"
+                  />
+                ) : (
+                  <div className="claim-card-row__thumb claim-card-row__thumb--fallback">
+                    {claim.item?.type ? (
+                      <TypeBadge type={claim.item.type} />
                     ) : (
                       <FileText size={18} aria-hidden="true" />
                     )}
-                  </span>
-                  <span className="claim-card-row__body">
-                    <span className="claim-card-row__head">
-                      <strong>{claim.item?.title ?? 'Item no longer available'}</strong>
-                      <ClaimStatusBadge status={claim.status} />
-                    </span>
-                    <span className="claim-card-row__meta">
-                      {claim.item ? <TypeBadge type={claim.item.type} /> : null}
-                      {claim.item && <span>{claim.item.type === 'lost' ? 'Lost' : 'Found'} item</span>}
-                      <span>· Submitted {timeAgo(claim.created_at)}</span>
-                    </span>
-                    {claim.status === 'rejected' && claim.rejection_reason && (
-                      <span className="claim-card-row__reason">Reason: {claim.rejection_reason}</span>
-                    )}
-                    {claim.status === 'meeting_required' && claim.meeting_details && (
-                      <span className="claim-card-row__reason">Meeting: {claim.meeting_details}</span>
-                    )}
-                  </span>
-                </Link>
+                  </div>
+                )}
+
+                <div className="claim-card-row__content">
+                  <div className="claim-card-row__head">
+                    <h3 className="claim-card-row__title">
+                      {claim.item ? (
+                        <Link to={`/item/${claim.item.id}`}>{claim.item.title}</Link>
+                      ) : (
+                        'Item no longer available'
+                      )}
+                    </h3>
+                    <ClaimStatusBadge status={claim.status} />
+                  </div>
+
+                  <p className="claim-card-row__details">
+                    Submitted {timeAgo(claim.created_at)}
+                    {claim.owner_name ? ` · Name on claim: ${claim.owner_name}` : ''}
+                  </p>
+
+                  <blockquote className="claim-card-row__quote">
+                    "{claim.verification_details}"
+                  </blockquote>
+
+                  {claim.status === 'rejected' && claim.rejection_reason && (
+                    <div className="alert alert--error" style={{ marginTop: 'var(--sp-sm)' }}>
+                      <strong>Reason for rejection:</strong>
+                      <p>{claim.rejection_reason}</p>
+                    </div>
+                  )}
+
+                  {claim.status === 'meeting_required' && (
+                    <div className="alert alert--info" style={{ marginTop: 'var(--sp-sm)' }}>
+                      <strong>Action required:</strong>
+                      <p>
+                        {claim.meeting_details ||
+                          'Please visit the Campus Security office or Lost & Found desk to verify this item in person.'}
+                      </p>
+                    </div>
+                  )}
+
+                  {claim.status === 'approved' && (
+                    <div className="alert alert--success" style={{ marginTop: 'var(--sp-sm)' }}>
+                      <strong>Claim Approved!</strong>
+                      <p>
+                        Your claim has been verified. You can message the staff below or visit the
+                        Lost &amp; Found office with your student ID to collect your item.
+                      </p>
+                    </div>
+                  )}
+                </div>
 
                 <div className="claim-card-actions">
                   <button
@@ -229,53 +332,57 @@ export default function MyClaimsPage() {
       ) : (
         /* Messages tab */
         !messages ? (
-          <LoadingScreen label="Loading messages…" />
-        ) : messages.length === 0 ? (
+          <LoadingScreen label="Loading conversations…" />
+        ) : threads.length === 0 ? (
           <EmptyState
             icon={MessageSquare}
-            title="No messages yet"
-            message="When you or an admin exchange messages regarding a claim, conversations will appear here."
+            title="No conversations yet"
+            message="When you or an admin exchange messages regarding an item or claim, conversations will appear here."
           />
         ) : (
           <ul className="notification-list">
-            {messages.map((m) => {
-              const isMe = m.sender_id === profile?.id
-              const otherName = isMe
-                ? (m.recipient?.name || 'Admin / Staff')
-                : (m.sender?.name || 'Admin / Staff')
-              const isUnread = !isMe && !m.read
+            {threads.map((thread) => {
+              const isUnread = thread.unreadCount > 0
+              const isMe = thread.lastMessage.sender_id === profile?.id
 
               return (
-                <li key={m.id}>
+                <li key={thread.id}>
                   <button
                     type="button"
                     className={cn(
                       'notification notification--chat-item',
                       isUnread && 'notification--unread',
                     )}
-                    onClick={() => openChatForMessage(m)}
+                    onClick={() => openChatForThread(thread)}
                   >
                     <span className="notification__icon">
                       <MessageSquare size={16} aria-hidden="true" />
                     </span>
                     <span className="notification__body">
                       <span className="notification__message">
-                        <strong>{isMe ? `You → ${otherName}` : otherName}:</strong> {m.body}
+                        <strong>
+                          {thread.otherUserName}
+                          {thread.otherUserRole === 'admin' ? ' (Admin)' : ''}:
+                        </strong>{' '}
+                        {isMe && <span className="muted">You: </span>}
+                        {thread.lastMessage.body}
                       </span>
                       <span className="notification__time">
-                        {m.claim?.item?.title && (
-                          <span className="notification__item-tag">
-                            Regarding “{m.claim.item.title}” ·{' '}
-                          </span>
-                        )}
-                        {timeAgo(m.created_at)}
+                        <span className="notification__item-tag">
+                          Regarding “{thread.itemTitle}” ·{' '}
+                        </span>
+                        {timeAgo(thread.lastMessage.created_at)}
                       </span>
                     </span>
                     <span className="chat-open-badge">
                       <Send size={12} aria-hidden="true" />
-                      Reply
+                      Open Chat
                     </span>
-                    {isUnread && <span className="notification__dot" aria-label="Unread" />}
+                    {isUnread && (
+                      <span className="filter-count" style={{ marginLeft: '6px' }}>
+                        {thread.unreadCount}
+                      </span>
+                    )}
                   </button>
                 </li>
               )

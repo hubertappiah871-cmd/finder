@@ -145,11 +145,27 @@ export default function ClaimMessagingModal({
       }
 
       const msgs = (data as MessageWithSender[] | null) ?? []
-      setMessages(msgs)
-      void resolveRecipient(msgs)
+
+      // Strictly isolate conversation between current user and target recipient
+      let filteredMsgs = msgs
+      const otherUserId = defaultRecipientId || resolvedRecipientId
+      if (!claimId && itemId && otherUserId) {
+        filteredMsgs = msgs.filter(
+          (m) =>
+            (m.sender_id === profile.id && m.recipient_id === otherUserId) ||
+            (m.sender_id === otherUserId && m.recipient_id === profile.id),
+        )
+      } else if (!claimId && itemId && profile.role !== 'admin') {
+        filteredMsgs = msgs.filter(
+          (m) => m.sender_id === profile.id || m.recipient_id === profile.id,
+        )
+      }
+
+      setMessages(filteredMsgs)
+      void resolveRecipient(filteredMsgs)
 
       // Mark unread incoming messages as read
-      const unreadIds = msgs
+      const unreadIds = filteredMsgs
         .filter((m) => m.recipient_id === profile.id && !m.read)
         .map((m) => m.id)
 
@@ -160,7 +176,7 @@ export default function ClaimMessagingModal({
           .in('id', unreadIds)
       }
     },
-    [claimId, itemId, profile, resolveRecipient],
+    [claimId, itemId, profile, resolveRecipient, defaultRecipientId, resolvedRecipientId],
   )
 
   useEffect(() => {
