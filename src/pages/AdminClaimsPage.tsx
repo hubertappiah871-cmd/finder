@@ -5,15 +5,15 @@ import PageHeader from '../components/PageHeader'
 import { EmptyState, ErrorState, LoadingScreen } from '../components/Feedback'
 import { ClaimStatusBadge, TypeBadge } from '../components/StatusBadge'
 import ClaimDecisionButtons from '../components/ClaimDecisionButtons'
+import ClaimMessagingModal from '../components/ClaimMessagingModal'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { supabase } from '../lib/supabase'
-import type { ClaimStatus, ClaimWithRelations, MessageWithSender } from '../lib/types'
+import type { ClaimStatus, ClaimWithRelations } from '../lib/types'
 import { cn, initials, timeAgo } from '../lib/utils'
 
 const CLAIMS_SELECT =
   '*, item:items!claims_item_id_fkey(id, title, type, photo_url, status), claimant:profiles!claims_claimant_uid_fkey(name, email)'
-const MESSAGES_SELECT = '*, sender:profiles!messages_sender_id_fkey(name, role)'
 
 type Tab = 'all' | ClaimStatus
 
@@ -33,11 +33,7 @@ export default function AdminClaimsPage() {
   const [tab, setTab] = useState<Tab>('pending')
 
   const [compareItemId, setCompareItemId] = useState<string | null>(null)
-
   const [messagingClaim, setMessagingClaim] = useState<ClaimWithRelations | null>(null)
-  const [messages, setMessages] = useState<MessageWithSender[]>([])
-  const [messageBody, setMessageBody] = useState('')
-  const [messageBusy, setMessageBusy] = useState(false)
   const location = useLocation()
 
   const load = useCallback(async () => {
@@ -106,42 +102,6 @@ export default function AdminClaimsPage() {
     return compareClaims.length > 0 ? compareClaims[0].item ?? null : null
   }, [compareClaims])
 
-  async function loadMessages(claimId: string) {
-    const { data, error: err } = await supabase
-      .from('messages')
-      .select(MESSAGES_SELECT)
-      .eq('claim_id', claimId)
-      .order('created_at', { ascending: true })
-      .limit(50)
-    if (err) {
-      console.error('Failed to load messages:', err.message)
-      toast('error', `Could not load messages: ${err.message}`)
-      setMessages([])
-      return
-    }
-    setMessages((data as MessageWithSender[] | null) ?? [])
-  }
-
-  async function sendMessage() {
-    if (!messagingClaim || !messageBody.trim() || !profile) return
-    setMessageBusy(true)
-    const { error } = await supabase.from('messages').insert({
-      claim_id: messagingClaim.id,
-      sender_id: profile.id,
-      recipient_id: messagingClaim.claimant_uid,
-      body: messageBody.trim(),
-    })
-    setMessageBusy(false)
-    if (error) {
-      console.error('Failed to send message:', error.message)
-      toast('error', `Could not send message: ${error.message}`)
-      return
-    }
-    setMessageBody('')
-    toast('success', 'Message sent.')
-    await loadMessages(messagingClaim.id)
-  }
-
   async function shareContact(claim: ClaimWithRelations) {
     if (!profile) return
     const contact = profile.email
@@ -161,7 +121,6 @@ export default function AdminClaimsPage() {
 
   function openMessaging(claim: ClaimWithRelations) {
     setMessagingClaim(claim)
-    void loadMessages(claim.id)
   }
 
   return (
@@ -320,61 +279,10 @@ export default function AdminClaimsPage() {
       )}
 
       {messagingClaim && (
-        <div
-          className="modal-backdrop"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setMessagingClaim(null)
-          }}
-        >
-          <div className="modal" role="dialog" aria-modal="true">
-            <h3 className="modal__title">
-              Message {messagingClaim.claimant?.name ?? 'claimant'}
-            </h3>
-            <p className="modal__message">
-              Regarding claim for "{messagingClaim.item?.title ?? 'item'}"
-            </p>
-
-            <div className="msg-thread">
-              {messages.length === 0 ? (
-                <p className="muted msg-empty">No messages yet.</p>
-              ) : (
-                messages.map((m) => (
-                  <div key={m.id} className="msg-item">
-                    <p className="msg-item__name">
-                      {m.sender?.name ?? 'Unknown'}:
-                    </p>
-                    <p className="msg-item__body">{m.body}</p>
-                    <p className="muted msg-item__time">{timeAgo(m.created_at)}</p>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="field">
-              <textarea
-                className="input"
-                rows={3}
-                placeholder="Type your message…"
-                value={messageBody}
-                onChange={(e) => setMessageBody(e.target.value)}
-              />
-            </div>
-
-            <div className="modal__actions">
-              <button type="button" className="btn btn--secondary" onClick={() => setMessagingClaim(null)}>
-                Close
-              </button>
-              <button
-                type="button"
-                className="btn btn--primary"
-                onClick={() => void sendMessage()}
-                disabled={messageBusy || !messageBody.trim()}
-              >
-                {messageBusy ? 'Sending…' : 'Send'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ClaimMessagingModal
+          claim={messagingClaim}
+          onClose={() => setMessagingClaim(null)}
+        />
       )}
     </div>
   )

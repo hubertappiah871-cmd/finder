@@ -21,12 +21,13 @@ import type { ClaimWithRelations, ItemWithReporter } from '../lib/types'
 import { ErrorState, LoadingScreen } from '../components/Feedback'
 import { ClaimStatusBadge, ItemStatusBadge, TypeBadge } from '../components/StatusBadge'
 import ClaimDecisionButtons from '../components/ClaimDecisionButtons'
+import ClaimMessagingModal from '../components/ClaimMessagingModal'
 import FormField from '../components/FormField'
 import { cn, formatDate, initials, timeAgo } from '../lib/utils'
 
 const ITEMS_SELECT = '*, reporter:profiles!items_reported_by_fkey(name, email)'
 const CLAIMS_SELECT =
-  '*, item:items!claims_item_id_fkey(id, title, type, photo_url, status), claimant:profiles!claims_claimant_uid_fkey(name, email)'
+  '*, item:items!claims_item_id_fkey(id, title, type, photo_url, status, reported_by), claimant:profiles!claims_claimant_uid_fkey(name, email)'
 
 const OWNER_NAME_RE = /^[A-Za-z\s'-]+$/
 const PHONE_RE = /^0\d{9}$/
@@ -41,6 +42,7 @@ export default function ItemDetailPage() {
   const [claims, setClaims] = useState<ClaimWithRelations[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [activeMessagingClaim, setActiveMessagingClaim] = useState<ClaimWithRelations | null>(null)
 
   // Claim form state
   const [ownerName, setOwnerName] = useState('')
@@ -189,24 +191,37 @@ export default function ItemDetailPage() {
     const location = foundItLocation.trim()
     const msg = foundItMessage.trim()
 
-    let notification = `${finderName} found your lost "${item.title}"!`
+    let notification = `${finderName} found your lost “${item.title}”!`
     notification += ` They found it at: ${location}.`
     notification += ` Contact them at: ${contact}.`
     if (msg) {
       notification += ` Message: ${msg}`
     }
 
-    const { error: err } = await supabase.from('notifications').insert({
-      user_id: item.reported_by,
-      message: notification,
+    // Attempt direct RPC call first
+    const { error: rpcErr } = await supabase.rpc('notify_item_found', {
+      target_item_id: item.id,
+      finder_contact: contact,
+      found_location: location,
+      finder_note: msg || null,
     })
 
-    setFoundItBusy(false)
-    if (err) {
-      toast('error', 'Could not send notification. Please try again.')
-      return
+    if (rpcErr) {
+      // Fallback to direct notifications table insert
+      const { error: insertErr } = await supabase.from('notifications').insert({
+        user_id: item.reported_by,
+        message: notification,
+      })
+
+      if (insertErr) {
+        console.error('Failed to notify owner:', insertErr.message)
+        setFoundItBusy(false)
+        toast('error', `Could not send notification: ${insertErr.message}`)
+        return
+      }
     }
 
+    setFoundItBusy(false)
     setFoundItSent(true)
     toast('success', 'The item owner has been notified!')
     setFoundItContact('')
@@ -497,6 +512,16 @@ export default function ItemDetailPage() {
           {myClaim.owner_name && (
             <p className="muted claim-details">Name: {myClaim.owner_name} · Contact: {myClaim.contact_info}</p>
           )}
+          <div className="claim-row__actions" style={{ marginTop: '1rem' }}>
+            <button
+              type="button"
+              className="btn btn--small btn--secondary"
+              onClick={() => setActiveMessagingClaim(myClaim)}
+            >
+              <MessageSquare size={14} aria-hidden="true" />
+              Chat / Message Staff
+            </button>
+          </div>
         </section>
       )}
 
@@ -536,11 +561,19 @@ export default function ItemDetailPage() {
                     {claim.status === 'meeting_required' && claim.meeting_details && (
                       <p className="muted">Meeting: {claim.meeting_details}</p>
                     )}
-                    {isAdmin && (claim.status === 'pending' || claim.status === 'meeting_required') && (
-                      <div className="claim-row__actions">
+                    <div className="claim-row__actions">
+                      {isAdmin && (claim.status === 'pending' || claim.status === 'meeting_required') && (
                         <ClaimDecisionButtons claim={claim} onDone={() => void load()} />
-                      </div>
-                    )}
+                      )}
+                      <button
+                        type="button"
+                        className="btn btn--small btn--secondary"
+                        onClick={() => setActiveMessagingClaim(claim)}
+                      >
+                        <MessageSquare size={14} aria-hidden="true" />
+                        Message
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -664,6 +697,13 @@ export default function ItemDetailPage() {
             )}
           </div>
         </div>
+      )}
+
+      {activeMessagingClaim && (
+        <ClaimMessagingModal
+          claim={activeMessagingClaim}
+          onClose={() => setActiveMessagingClaim(null)}
+        />
       )}
     </div>
   )

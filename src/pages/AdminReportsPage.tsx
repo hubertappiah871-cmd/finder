@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import {
   BadgeCheck,
@@ -58,7 +58,7 @@ export default function AdminReportsPage() {
   const [dateError, setDateError] = useState('')
 
   const [exporting, setExporting] = useState(false)
-  const manualRefreshUsed = useRef(false)
+  const [manualRefreshUsed, setManualRefreshUsed] = useState(false)
   const location = useLocation()
 
   const load = useCallback(async () => {
@@ -121,8 +121,8 @@ export default function AdminReportsPage() {
   }, [load])
 
   function handleManualRefresh() {
-    if (manualRefreshUsed.current) return
-    manualRefreshUsed.current = true
+    if (manualRefreshUsed) return
+    setManualRefreshUsed(true)
     void load()
     toast('info', 'Dashboard refreshed. Manual refresh limited to once per session.')
   }
@@ -216,7 +216,7 @@ export default function AdminReportsPage() {
               type="button"
               className="btn btn--secondary btn--small"
               onClick={handleManualRefresh}
-              disabled={manualRefreshUsed.current}
+              disabled={manualRefreshUsed}
               title="Refresh data (once per session)"
             >
               <RefreshCw size={15} aria-hidden="true" />

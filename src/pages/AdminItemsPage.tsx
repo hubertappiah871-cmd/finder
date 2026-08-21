@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Eye, PackageSearch, Search, Trash2 } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import { EmptyState, ErrorState, LoadingScreen } from '../components/Feedback'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -37,9 +37,11 @@ export default function AdminItemsPage() {
     setItems((data as ItemWithReporter[] | null) ?? [])
   }
 
+  const location = useLocation()
+
   useEffect(() => {
     void load()
-  }, [])
+  }, [location.pathname])
 
   const filtered = useMemo(() => {
     if (!items) return []

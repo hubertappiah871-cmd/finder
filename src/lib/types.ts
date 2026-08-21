@@ -50,7 +50,7 @@ export interface Claim {
 
 /** Claim with the item and claimant embedded */
 export interface ClaimWithRelations extends Claim {
-  item: Pick<Item, 'id' | 'title' | 'type' | 'photo_url' | 'status'> | null
+  item: (Pick<Item, 'id' | 'title' | 'type' | 'photo_url' | 'status'> & { reported_by?: string | null }) | null
   claimant: Pick<Profile, 'name' | 'email'> | null
 }
 
@@ -68,6 +68,11 @@ export interface Message {
 /** Message with sender profile embedded */
 export interface MessageWithSender extends Message {
   sender: Pick<Profile, 'name' | 'role'> | null
+  recipient?: Pick<Profile, 'name' | 'role'> | null
+  claim?: (Pick<Claim, 'id' | 'item_id' | 'claimant_uid' | 'status'> & {
+    item?: Pick<Item, 'id' | 'title' | 'type' | 'photo_url'> | null
+    claimant?: Pick<Profile, 'name' | 'email'> | null
+  }) | null
 }
 
 /** notifications table */

@@ -50,10 +50,24 @@ create table if not exists public.claims (
   id uuid primary key default gen_random_uuid(),
   item_id uuid not null references public.items (id) on delete cascade,
   claimant_uid uuid not null references public.profiles (id) on delete cascade,
+  owner_name text,
+  contact_info text,
   verification_details text not null,
-  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'meeting_required')),
   rejection_reason text,
+  admin_notes text,
+  meeting_details text,
   created_at timestamptz not null default now()
+);
+
+create table if not exists public.messages (
+  id uuid primary key default gen_random_uuid(),
+  claim_id uuid not null references public.claims (id) on delete cascade,
+  sender_id uuid not null references public.profiles (id) on delete cascade,
+  recipient_id uuid not null references public.profiles (id) on delete cascade,
+  body text not null,
+  created_at timestamptz not null default now(),
+  read boolean not null default false
 );
 
 create table if not exists public.notifications (
@@ -70,6 +84,12 @@ create index if not exists items_category_idx on public.items (category);
 create index if not exists claims_item_idx on public.claims (item_id);
 create index if not exists claims_status_idx on public.claims (status);
 create index if not exists notifications_user_idx on public.notifications (user_id);
+create index if not exists messages_claim_idx on public.messages (claim_id);
+create index if not exists messages_recipient_idx on public.messages (recipient_id);
+
+create unique index if not exists claims_unique_active_claim
+  on public.claims (item_id, claimant_uid)
+  where status in ('pending', 'meeting_required');
 
 -- ----------------------------------------------------------------------------
 -- 2. AUTO-CREATE A PROFILE WHEN A USER SIGNS UP
@@ -108,6 +128,7 @@ alter table public.profiles enable row level security;
 alter table public.items enable row level security;
 alter table public.claims enable row level security;
 alter table public.notifications enable row level security;
+alter table public.messages enable row level security;
 
 -- Helper: is the current user an active admin?
 create or replace function public.is_admin()
@@ -152,7 +173,7 @@ begin
 
   update public.claims
   set status = 'approved'
-  where id = target_claim_id and status = 'pending';
+  where id = target_claim_id and status in ('pending', 'meeting_required');
 
   if not found then
     raise exception 'Claim not found or already decided';
@@ -163,8 +184,18 @@ begin
   update public.items
   set status = 'claimed'
   where id = v_item_id and status = 'open';
+
+  -- Auto-reject other active claims on the same item
+  update public.claims
+  set status = 'rejected',
+      rejection_reason = 'Another claim was approved for this item'
+  where item_id = v_item_id
+    and id != target_claim_id
+    and status in ('pending', 'meeting_required');
 end;
 $$;
+
+grant execute on function public.approve_claim(uuid) to authenticated;
 
 -- items: anyone can browse; signed-in users report items; admins moderate.
 drop policy if exists "items_select" on public.items;
@@ -189,18 +220,35 @@ create policy "claims_insert" on public.claims for insert with check (auth.uid()
 drop policy if exists "claims_admin_update" on public.claims;
 create policy "claims_admin_update" on public.claims for update using (public.is_admin());
 
--- notifications: users only ever see their own.
+-- notifications: users only ever see their own; authenticated users can send notifications
 drop policy if exists "notifications_select" on public.notifications;
 create policy "notifications_select" on public.notifications for select using (auth.uid() = user_id);
 
 drop policy if exists "notifications_insert" on public.notifications;
-create policy "notifications_insert" on public.notifications for insert with check (auth.uid() = user_id);
+create policy "notifications_insert" on public.notifications for insert with check (auth.uid() is not null);
 
 drop policy if exists "notifications_update" on public.notifications;
 create policy "notifications_update" on public.notifications for update using (auth.uid() = user_id);
 
 drop policy if exists "notifications_delete" on public.notifications;
 create policy "notifications_delete" on public.notifications for delete using (auth.uid() = user_id);
+
+-- messages: any authenticated user can send; sender, recipient, and admin can read; recipient marks read
+drop policy if exists "messages_insert" on public.messages;
+create policy "messages_insert" on public.messages
+  for insert to authenticated
+  with check (sender_id = auth.uid());
+
+drop policy if exists "messages_select" on public.messages;
+create policy "messages_select" on public.messages
+  for select to authenticated
+  using (auth.uid() = sender_id or auth.uid() = recipient_id or public.is_admin());
+
+drop policy if exists "messages_update" on public.messages;
+create policy "messages_update" on public.messages
+  for update to authenticated
+  using (auth.uid() = recipient_id)
+  with check (auth.uid() = recipient_id);
 
 -- ----------------------------------------------------------------------------
 -- 4. STORAGE — public bucket for item photos (5 MB limit)
@@ -333,7 +381,7 @@ create trigger items_notify_admins
   after insert on public.items
   for each row execute function public.notify_admins_new_item();
 
--- New found item → notify owners of matching open lost items (same category)
+-- New item registered/reported → notify owners of matching open items in same category
 create or replace function public.notify_matching_owners()
 returns trigger
 language plpgsql
@@ -342,6 +390,7 @@ set search_path = public
 as $$
 begin
   if new.type = 'found' then
+    -- A found item was registered -> notify owners of open lost items in same category
     insert into public.notifications (user_id, message)
     select i.reported_by,
            'A found item matching your lost “' || i.title || '” was just registered: “'
@@ -349,7 +398,20 @@ begin
     from public.items i
     where i.type = 'lost'
       and i.status = 'open'
-      and i.category = new.category
+      and lower(trim(i.category)) = lower(trim(new.category))
+      and i.reported_by is not null
+      and i.reported_by is distinct from new.reported_by;
+
+  elsif new.type = 'lost' then
+    -- A lost item was reported -> check if a matching found item is already in system
+    insert into public.notifications (user_id, message)
+    select new.reported_by,
+           'A previously registered found item may match your lost “' || new.title || '”: “'
+             || i.title || '” (' || i.category || ').'
+    from public.items i
+    where i.type = 'found'
+      and i.status = 'open'
+      and lower(trim(i.category)) = lower(trim(new.category))
       and i.reported_by is not null
       and i.reported_by is distinct from new.reported_by;
   end if;
@@ -398,7 +460,7 @@ as $$
 declare
   item_title text;
 begin
-  if new.status = old.status or new.status not in ('approved', 'rejected') then
+  if new.status = old.status or new.status not in ('approved', 'rejected', 'meeting_required') then
     return new;
   end if;
 
@@ -414,6 +476,16 @@ begin
            'The claim for your found “' || i.title || '” was approved — the item is now marked as claimed.'
     from public.items i
     where i.id = new.item_id and i.reported_by is not null;
+
+  elsif new.status = 'meeting_required' then
+    insert into public.notifications (user_id, message)
+    values (new.claimant_uid,
+            'An admin needs to verify your claim for “' || coalesce(item_title, 'item') || '” in person.'
+              || case when new.meeting_details is not null
+                      then ' ' || new.meeting_details
+                      else ' Please contact the admin office to arrange a meeting.'
+                 end);
+
   else
     insert into public.notifications (user_id, message)
     values (new.claimant_uid,
@@ -456,3 +528,88 @@ drop trigger if exists items_notify_resolved on public.items;
 create trigger items_notify_resolved
   after update on public.items
   for each row execute function public.notify_item_resolved();
+
+-- New message → notify recipient with sender name and claim info
+create or replace function public.notify_new_message()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  sender_name text;
+  claim_item_title text;
+begin
+  select name into sender_name from public.profiles where id = new.sender_id;
+
+  select i.title into claim_item_title
+  from public.claims c
+  join public.items i on i.id = c.item_id
+  where c.id = new.claim_id;
+
+  insert into public.notifications (user_id, message)
+  values (
+    new.recipient_id,
+    coalesce(sender_name, 'A user') || ' sent you a message'
+      || case when claim_item_title is not null then ' regarding “' || claim_item_title || '”' else '' end
+      || ': “' || case when length(new.body) > 60 then substr(new.body, 1, 57) || '…' else new.body end || '”'
+  );
+  return new;
+end;
+$$;
+
+drop trigger if exists messages_notify_recipient on public.messages;
+create trigger messages_notify_recipient
+  after insert on public.messages
+  for each row execute function public.notify_new_message();
+
+-- Helper RPC: direct owner notification when someone reports finding a lost item
+create or replace function public.notify_item_found(
+  target_item_id uuid,
+  finder_contact text,
+  found_location text,
+  finder_note text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_item record;
+  v_finder_name text;
+  v_msg text;
+begin
+  select id, title, reported_by into v_item
+  from public.items
+  where id = target_item_id;
+
+  if not found then
+    raise exception 'Item not found';
+  end if;
+
+  if v_item.reported_by is null then
+    raise exception 'This item has no recorded owner';
+  end if;
+
+  if v_item.reported_by = auth.uid() then
+    raise exception 'You cannot notify yourself';
+  end if;
+
+  select name into v_finder_name from public.profiles where id = auth.uid();
+
+  v_msg := coalesce(v_finder_name, 'Someone') || ' found your lost “' || v_item.title || '”!'
+           || ' Location: ' || found_location
+           || ' · Contact: ' || finder_contact;
+
+  if finder_note is not null and length(trim(finder_note)) > 0 then
+    v_msg := v_msg || ' · Note: ' || trim(finder_note);
+  end if;
+
+  insert into public.notifications (user_id, message)
+  values (v_item.reported_by, v_msg);
+end;
+$$;
+
+grant execute on function public.notify_item_found(uuid, text, text, text) to authenticated;
+

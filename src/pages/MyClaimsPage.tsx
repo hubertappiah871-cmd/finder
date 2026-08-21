@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { ClipboardCheck, FileText, MessageSquare } from 'lucide-react'
+import { ClipboardCheck, FileText, MessageSquare, Send } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import { EmptyState, ErrorState, LoadingScreen } from '../components/Feedback'
 import { ClaimStatusBadge, TypeBadge } from '../components/StatusBadge'
+import ClaimMessagingModal from '../components/ClaimMessagingModal'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import type { ClaimWithRelations, MessageWithSender } from '../lib/types'
 import { cn, timeAgo } from '../lib/utils'
 
 const CLAIMS_SELECT =
-  '*, item:items!claims_item_id_fkey(id, title, type, photo_url, status), claimant:profiles!claims_claimant_uid_fkey(name, email)'
-const MESSAGES_SELECT = '*, sender:profiles!messages_sender_id_fkey(name, role)'
+  '*, item:items!claims_item_id_fkey(id, title, type, photo_url, status, reported_by), claimant:profiles!claims_claimant_uid_fkey(name, email)'
+const MESSAGES_SELECT =
+  '*, sender:profiles!messages_sender_id_fkey(name, role), recipient:profiles!messages_recipient_id_fkey(name, role), claim:claims!messages_claim_id_fkey(id, item_id, claimant_uid, status, item:items!claims_item_id_fkey(id, title, type, photo_url, status, reported_by), claimant:profiles!claims_claimant_uid_fkey(name, email))'
 
 type Tab = 'claims' | 'messages'
 
@@ -21,6 +23,7 @@ export default function MyClaimsPage() {
   const [messages, setMessages] = useState<MessageWithSender[] | null>(null)
   const [error, setError] = useState('')
   const [tab, setTab] = useState<Tab>('claims')
+  const [activeMessagingClaim, setActiveMessagingClaim] = useState<ClaimWithRelations | null>(null)
 
   const loadClaims = useCallback(async () => {
     if (!profile) return
@@ -42,26 +45,23 @@ export default function MyClaimsPage() {
     const { data, error: err } = await supabase
       .from('messages')
       .select(MESSAGES_SELECT)
-      .eq('recipient_id', profile.id)
+      .or(`recipient_id.eq.${profile.id},sender_id.eq.${profile.id}`)
       .order('created_at', { ascending: false })
       .limit(100)
+
     if (err) {
-      setError('Could not load messages.')
+      console.error('Could not load messages:', err.message)
+      // Fallback query in case foreign key path differs
+      const { data: fallbackData } = await supabase
+        .from('messages')
+        .select('*, sender:profiles!messages_sender_id_fkey(name, role), recipient:profiles!messages_recipient_id_fkey(name, role)')
+        .or(`recipient_id.eq.${profile.id},sender_id.eq.${profile.id}`)
+        .order('created_at', { ascending: false })
+        .limit(100)
+      setMessages((fallbackData as MessageWithSender[] | null) ?? [])
       return
     }
     setMessages((data as MessageWithSender[] | null) ?? [])
-
-    // Mark unread messages as read
-    const unread = (data as MessageWithSender[] | null)?.filter((m) => !m.read) ?? []
-    if (unread.length > 0) {
-      await supabase
-        .from('messages')
-        .update({ read: true })
-        .in(
-          'id',
-          unread.map((m) => m.id),
-        )
-    }
   }, [profile])
 
   const location = useLocation()
@@ -79,17 +79,46 @@ export default function MyClaimsPage() {
     }
   }, [profile, loadClaims, loadMessages, location.pathname])
 
-  async function markMessageRead(msg: MessageWithSender) {
-    if (msg.read) return
-    setMessages((prev) => prev?.map((m) => (m.id === msg.id ? { ...m, read: true } : m)) ?? null)
-    await supabase.from('messages').update({ read: true }).eq('id', msg.id)
+  const unreadCount =
+    messages?.filter((m) => m.recipient_id === profile?.id && !m.read).length ?? 0
+
+  function openChatForClaim(claim: ClaimWithRelations) {
+    setActiveMessagingClaim(claim)
+  }
+
+  function openChatForMessage(msg: MessageWithSender) {
+    if (msg.claim) {
+      setActiveMessagingClaim(msg.claim as ClaimWithRelations)
+      return
+    }
+    // If claim wasn't embedded, find from loaded claims or create minimal object
+    const matched = claims?.find((c) => c.id === msg.claim_id)
+    if (matched) {
+      setActiveMessagingClaim(matched)
+    } else {
+      setActiveMessagingClaim({
+        id: msg.claim_id,
+        item_id: '',
+        claimant_uid: profile?.id ?? '',
+        owner_name: '',
+        contact_info: '',
+        verification_details: '',
+        status: 'pending',
+        rejection_reason: null,
+        admin_notes: null,
+        meeting_details: null,
+        created_at: msg.created_at,
+        item: null,
+        claimant: { name: profile?.name ?? 'Me', email: profile?.email ?? '' },
+      })
+    }
   }
 
   return (
     <div className="container page">
       <PageHeader
         title="My claims"
-        subtitle="Track every item you have claimed, from submission to resolution."
+        subtitle="Track every item you have claimed, message staff/admin, and resolve handovers."
       />
 
       <div className="tabs">
@@ -107,7 +136,7 @@ export default function MyClaimsPage() {
           onClick={() => setTab('messages')}
         >
           Messages
-          <span className="tabs__count">{messages?.filter((m) => !m.read).length ?? 0}</span>
+          {unreadCount > 0 && <span className="tabs__count tabs__count--unread">{unreadCount}</span>}
         </button>
       </div>
 
@@ -125,32 +154,45 @@ export default function MyClaimsPage() {
         ) : (
           <div className="claim-card-list">
             {claims.map((claim) => (
-              <Link key={claim.id} to={`/items/${claim.item_id}`} className="claim-card-row">
-                <span className="claim-card-row__thumb">
-                  {claim.item?.photo_url ? (
-                    <img src={claim.item.photo_url} alt="" />
-                  ) : (
-                    <FileText size={18} aria-hidden="true" />
-                  )}
-                </span>
-                <span className="claim-card-row__body">
-                  <span className="claim-card-row__head">
-                    <strong>{claim.item?.title ?? 'Item no longer available'}</strong>
-                    <ClaimStatusBadge status={claim.status} />
+              <div key={claim.id} className="claim-card-row-wrapper">
+                <Link to={`/items/${claim.item_id}`} className="claim-card-row">
+                  <span className="claim-card-row__thumb">
+                    {claim.item?.photo_url ? (
+                      <img src={claim.item.photo_url} alt="" />
+                    ) : (
+                      <FileText size={18} aria-hidden="true" />
+                    )}
                   </span>
-                  <span className="claim-card-row__meta">
-                    {claim.item ? <TypeBadge type={claim.item.type} /> : null}
-                    {claim.item && <span>{claim.item.type === 'lost' ? 'Lost' : 'Found'} item</span>}
-                    <span>· Submitted {timeAgo(claim.created_at)}</span>
+                  <span className="claim-card-row__body">
+                    <span className="claim-card-row__head">
+                      <strong>{claim.item?.title ?? 'Item no longer available'}</strong>
+                      <ClaimStatusBadge status={claim.status} />
+                    </span>
+                    <span className="claim-card-row__meta">
+                      {claim.item ? <TypeBadge type={claim.item.type} /> : null}
+                      {claim.item && <span>{claim.item.type === 'lost' ? 'Lost' : 'Found'} item</span>}
+                      <span>· Submitted {timeAgo(claim.created_at)}</span>
+                    </span>
+                    {claim.status === 'rejected' && claim.rejection_reason && (
+                      <span className="claim-card-row__reason">Reason: {claim.rejection_reason}</span>
+                    )}
+                    {claim.status === 'meeting_required' && claim.meeting_details && (
+                      <span className="claim-card-row__reason">Meeting: {claim.meeting_details}</span>
+                    )}
                   </span>
-                  {claim.status === 'rejected' && claim.rejection_reason && (
-                    <span className="claim-card-row__reason">Reason: {claim.rejection_reason}</span>
-                  )}
-                  {claim.status === 'meeting_required' && claim.meeting_details && (
-                    <span className="claim-card-row__reason">Meeting: {claim.meeting_details}</span>
-                  )}
-                </span>
-              </Link>
+                </Link>
+
+                <div className="claim-card-actions">
+                  <button
+                    type="button"
+                    className="btn btn--small btn--secondary"
+                    onClick={() => openChatForClaim(claim)}
+                  >
+                    <MessageSquare size={14} aria-hidden="true" />
+                    Chat / Message Admin
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         )
@@ -162,32 +204,62 @@ export default function MyClaimsPage() {
           <EmptyState
             icon={MessageSquare}
             title="No messages yet"
-            message="When an admin contacts you about a claim, it will appear here."
+            message="When you or an admin exchange messages regarding a claim, conversations will appear here."
           />
         ) : (
           <ul className="notification-list">
-            {messages.map((m) => (
-              <li key={m.id}>
-                <button
-                  type="button"
-                  className={cn('notification', !m.read && 'notification--unread')}
-                  onClick={() => void markMessageRead(m)}
-                >
-                  <span className="notification__icon">
-                    <MessageSquare size={16} aria-hidden="true" />
-                  </span>
-                  <span className="notification__body">
-                    <span className="notification__message">
-                      <strong>{m.sender?.name ?? 'Admin'}:</strong> {m.body}
+            {messages.map((m) => {
+              const isMe = m.sender_id === profile?.id
+              const otherName = isMe
+                ? (m.recipient?.name || 'Admin / Staff')
+                : (m.sender?.name || 'Admin / Staff')
+              const isUnread = !isMe && !m.read
+
+              return (
+                <li key={m.id}>
+                  <button
+                    type="button"
+                    className={cn(
+                      'notification notification--chat-item',
+                      isUnread && 'notification--unread',
+                    )}
+                    onClick={() => openChatForMessage(m)}
+                  >
+                    <span className="notification__icon">
+                      <MessageSquare size={16} aria-hidden="true" />
                     </span>
-                    <span className="notification__time">{timeAgo(m.created_at)}</span>
-                  </span>
-                  {!m.read && <span className="notification__dot" aria-label="Unread" />}
-                </button>
-              </li>
-            ))}
+                    <span className="notification__body">
+                      <span className="notification__message">
+                        <strong>{isMe ? `You → ${otherName}` : otherName}:</strong> {m.body}
+                      </span>
+                      <span className="notification__time">
+                        {m.claim?.item?.title && (
+                          <span className="notification__item-tag">
+                            Regarding “{m.claim.item.title}” ·{' '}
+                          </span>
+                        )}
+                        {timeAgo(m.created_at)}
+                      </span>
+                    </span>
+                    <span className="chat-open-badge">
+                      <Send size={12} aria-hidden="true" />
+                      Reply
+                    </span>
+                    {isUnread && <span className="notification__dot" aria-label="Unread" />}
+                  </button>
+                </li>
+              )
+            })}
           </ul>
         )
+      )}
+
+      {activeMessagingClaim && (
+        <ClaimMessagingModal
+          claim={activeMessagingClaim}
+          onClose={() => setActiveMessagingClaim(null)}
+          onMessageSent={() => void loadMessages()}
+        />
       )}
     </div>
   )

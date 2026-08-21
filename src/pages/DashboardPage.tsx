@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import {
   Bell,
   ClipboardCheck,
@@ -33,6 +33,7 @@ interface UserStats {
 
 function UserDashboard() {
   const { profile } = useAuth()
+  const location = useLocation()
   const [stats, setStats] = useState<UserStats | null>(null)
   const [recent, setRecent] = useState<ItemWithReporter[]>([])
   const [error, setError] = useState('')
@@ -64,11 +65,12 @@ function UserDashboard() {
     setRecent((items.data as ItemWithReporter[] | null) ?? [])
   }, [profile])
 
+  // Re-fetch every time the user navigates to the dashboard
   useEffect(() => {
     void load()
-  }, [load])
+  }, [load, location.pathname])
 
-  // Refresh stats when the window regains focus (user navigates back from another page)
+  // Also refresh on window focus (e.g. switching back from another tab)
   useEffect(() => {
     function onFocus() {
       void load()
@@ -157,6 +159,7 @@ interface AdminStats {
 
 function AdminDashboard() {
   const { profile } = useAuth()
+  const location = useLocation()
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [pendingClaims, setPendingClaims] = useState<ClaimWithRelations[]>([])
   const [recent, setRecent] = useState<ItemWithReporter[]>([])
@@ -187,11 +190,12 @@ function AdminDashboard() {
     setRecent((itemsRes.data as ItemWithReporter[] | null) ?? [])
   }, [])
 
+  // Re-fetch every time the user navigates to the dashboard
   useEffect(() => {
     void load()
-  }, [load])
+  }, [load, location.pathname])
 
-  // Refresh stats when the window regains focus
+  // Also refresh on window focus
   useEffect(() => {
     function onFocus() {
       void load()
