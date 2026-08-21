@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Link, NavLink, useLocation } from 'react-router-dom'
+import { useEffect, useState, type FormEvent } from 'react'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   Bell,
   ClipboardList,
@@ -9,7 +9,7 @@ import {
   Menu,
   Moon,
   Package,
-  PackageSearch,
+  PackagePlus,
   Search,
   Sun,
   Users,
@@ -20,13 +20,14 @@ import { supabase } from '../lib/supabase'
 import { cn, initials } from '../lib/utils'
 
 const USER_LINKS = [
-  { to: '/search', label: 'Search', icon: Search },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/report-lost', label: 'Report Lost', icon: Package },
-  { to: '/register-found', label: 'Register Found', icon: PackageSearch },
+  { to: '/register-found', label: 'Report Found', icon: PackagePlus },
   { to: '/my-claims', label: 'My Claims', icon: ClipboardList },
 ]
 
 const ADMIN_LINKS = [
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/admin/items', label: 'Manage Items', icon: Package },
   { to: '/admin/claims', label: 'Manage Claims', icon: ClipboardList },
   { to: '/admin/reports', label: 'Reports', icon: LayoutDashboard },
@@ -83,12 +84,14 @@ function useUnreadCount(): number {
 
 export default function Navbar() {
   const { profile, signOut } = useAuth()
+  const [navSearch, setNavSearch] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'light'
   })
 
   const location = useLocation()
+  const navigate = useNavigate()
   const unread = useUnreadCount()
 
   useEffect(() => {
@@ -98,6 +101,16 @@ export default function Navbar() {
 
   function toggleTheme() {
     setTheme((t) => (t === 'light' ? 'dark' : 'light'))
+  }
+
+  function handleSearchSubmit(e: FormEvent) {
+    e.preventDefault()
+    const q = navSearch.trim()
+    if (q) {
+      navigate(`/search?q=${encodeURIComponent(q)}`)
+    } else {
+      navigate('/search')
+    }
   }
 
   useEffect(() => {
@@ -121,15 +134,31 @@ export default function Navbar() {
           </span>
         </Link>
 
-        <nav className={cn('navbar__links', menuOpen && 'navbar__links--open')} aria-label="Main navigation">
+        {/* Prominent Quick Search Field */}
+        <form className="navbar__search-form" onSubmit={handleSearchSubmit}>
+          <Search size={15} aria-hidden="true" className="navbar__search-icon" />
+          <input
+            type="text"
+            className="navbar__search-input"
+            placeholder="Search lost &amp; found items…"
+            value={navSearch}
+            onChange={(e) => setNavSearch(e.target.value)}
+          />
+          <kbd className="navbar__search-kbd">⌘K</kbd>
+        </form>
+
+        <nav
+          className={cn('navbar__links', menuOpen && 'navbar__links--open')}
+          aria-label="Main navigation"
+        >
           {links.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
-              end={to === '/search'}
+              end={to === '/dashboard'}
               className={({ isActive }) => cn('navbar__link', isActive && 'navbar__link--active')}
             >
-              <Icon size={16} aria-hidden="true" />
+              <Icon size={15} aria-hidden="true" />
               <span>{label}</span>
             </NavLink>
           ))}
@@ -143,7 +172,7 @@ export default function Navbar() {
             aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             onClick={toggleTheme}
           >
-            {theme === 'dark' ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
+            {theme === 'dark' ? <Sun size={17} aria-hidden="true" /> : <Moon size={17} aria-hidden="true" />}
           </button>
 
           <Link
@@ -152,15 +181,19 @@ export default function Navbar() {
             aria-label={`Notifications${unread > 0 ? ` (${unread} unread)` : ''}`}
             title="Notifications"
           >
-            <Bell size={19} aria-hidden="true" />
+            <Bell size={18} aria-hidden="true" />
             {unread > 0 && <span className="navbar__badge">{unread > 9 ? '9+' : unread}</span>}
           </Link>
+
+          <div className="navbar__user-divider" />
 
           <div className="navbar__user">
             <span className="navbar__avatar">{initials(profile.name)}</span>
             <span className="navbar__user-meta">
               <span className="navbar__user-name">{profile.name}</span>
-              <span className="navbar__user-role">{profile.role === 'admin' ? 'Administrator' : 'Student'}</span>
+              <span className="navbar__user-role">
+                {profile.role === 'admin' ? 'Administrator' : 'Student'}
+              </span>
             </span>
           </div>
 
@@ -171,7 +204,7 @@ export default function Navbar() {
             aria-label="Sign out"
             onClick={() => void signOut()}
           >
-            <LogOut size={18} aria-hidden="true" />
+            <LogOut size={17} aria-hidden="true" />
           </button>
 
           <button

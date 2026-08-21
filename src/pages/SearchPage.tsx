@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { PackageSearch, RotateCcw, Search, SearchX, SlidersHorizontal, X } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import ItemCard from '../components/ItemCard'
@@ -35,9 +36,20 @@ const TYPE_OPTIONS: Array<{ value: Filters['type']; label: string }> = [
 ]
 
 export default function SearchPage() {
+  const [searchParams] = useSearchParams()
   const [items, setItems] = useState<ItemWithReporter[] | null>(null)
   const [error, setError] = useState('')
-  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
+  const [filters, setFilters] = useState<Filters>(() => {
+    const q = searchParams.get('q') || ''
+    const t = searchParams.get('type') as ItemType | null
+    const c = searchParams.get('category') || 'all'
+    return {
+      ...DEFAULT_FILTERS,
+      q,
+      type: t === 'lost' || t === 'found' ? t : 'all',
+      category: c,
+    }
+  })
   const [showFilters, setShowFilters] = useState(false)
   const [debouncedQuery, setDebouncedQuery] = useState('')
 
@@ -48,6 +60,20 @@ export default function SearchPage() {
     }, 200)
     return () => clearTimeout(handler)
   }, [filters.q])
+
+  useEffect(() => {
+    const qParam = searchParams.get('q')
+    const typeParam = searchParams.get('type') as ItemType | null
+    const catParam = searchParams.get('category')
+    if (qParam !== null || typeParam !== null || catParam !== null) {
+      setFilters((prev) => ({
+        ...prev,
+        q: qParam !== null ? qParam : prev.q,
+        type: typeParam === 'lost' || typeParam === 'found' ? typeParam : prev.type,
+        category: catParam !== null ? catParam : prev.category,
+      }))
+    }
+  }, [searchParams])
 
   useEffect(() => {
     let active = true

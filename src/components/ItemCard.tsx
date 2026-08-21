@@ -1,11 +1,33 @@
 import { Link } from 'react-router-dom'
-import { Calendar, MapPin } from 'lucide-react'
+import {
+  Briefcase,
+  Calendar,
+  CreditCard,
+  Key,
+  Laptop,
+  MapPin,
+  Package,
+  Shirt,
+  Tag,
+  type LucideIcon,
+} from 'lucide-react'
 import { ITEM_TYPE_LABEL } from '../lib/constants'
 import type { ItemWithReporter } from '../lib/types'
 import { formatDate } from '../lib/utils'
 import { ItemStatusBadge } from './StatusBadge'
 
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  Clothing: Shirt,
+  Electronics: Laptop,
+  'Bags & Luggage': Briefcase,
+  'IDs & Cards': CreditCard,
+  Keys: Key,
+  Other: Package,
+}
+
 export default function ItemCard({ item }: { item: ItemWithReporter }) {
+  const CatIcon = CATEGORY_ICONS[item.category] || Tag
+
   return (
     <Link to={`/items/${item.id}`} className="item-card">
       <div className="item-card__media">
@@ -19,24 +41,50 @@ export default function ItemCard({ item }: { item: ItemWithReporter }) {
             }}
           />
         ) : (
-          <span className="item-card__placeholder">{item.type === 'lost' ? 'LOST' : 'FOUND'}</span>
+          <div className="item-card__placeholder">
+            <CatIcon size={32} strokeWidth={1.5} aria-hidden="true" className="item-card__placeholder-icon" />
+            <span className="item-card__placeholder-text">No image added</span>
+          </div>
         )}
-        <span className={`item-card__type item-card__type--${item.type}`}>{ITEM_TYPE_LABEL[item.type]}</span>
-        <span className="item-card__status">
-          <ItemStatusBadge status={item.status} />
-        </span>
+
+        <div className="item-card__badges">
+          <span className={`item-card__type item-card__type--${item.type}`}>
+            {ITEM_TYPE_LABEL[item.type]}
+          </span>
+          <span className="item-card__status">
+            <ItemStatusBadge status={item.status} />
+          </span>
+        </div>
       </div>
+
       <div className="item-card__body">
-        <h3 className="item-card__title">{item.title}</h3>
-        <p className="item-card__category">{item.category}</p>
-        <p className="item-card__meta">
-          <MapPin size={14} aria-hidden="true" />
-          <span>{item.location}</span>
-        </p>
-        <p className="item-card__meta">
-          <Calendar size={14} aria-hidden="true" />
-          <span>{formatDate(item.date)}</span>
-        </p>
+        <h3 className="item-card__title" title={item.title}>
+          {item.title}
+        </h3>
+
+        <div className="item-card__category-row">
+          <span className="item-card__category-tag">
+            <CatIcon size={12} aria-hidden="true" />
+            <span>{item.category}</span>
+          </span>
+        </div>
+
+        <div className="item-card__meta-grid">
+          <p className="item-card__meta">
+            <MapPin size={13} aria-hidden="true" className="item-card__meta-icon" />
+            <span className="truncate">{item.location}</span>
+          </p>
+          <p className="item-card__meta">
+            <Calendar size={13} aria-hidden="true" className="item-card__meta-icon" />
+            <span>{formatDate(item.date)}</span>
+          </p>
+        </div>
+
+        {item.description && (
+          <p className="item-card__snippet" title={item.description}>
+            {item.description}
+          </p>
+        )}
       </div>
     </Link>
   )

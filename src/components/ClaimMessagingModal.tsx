@@ -89,32 +89,38 @@ export default function ClaimMessagingModal({
         }
       }
 
-      // 3. If there's an existing message from someone else in this specific thread, message them back
+      // 3. If current user is a Student / regular user: message an Admin
+      if (profile.role !== 'admin') {
+        const { data: adminData } = await supabase
+          .from('profiles')
+          .select('id, name')
+          .eq('role', 'admin')
+          .eq('active', true)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle()
+
+        if (adminData) {
+          setResolvedRecipientId(adminData.id)
+          setResolvedRecipientName(adminData.name || 'Campus Admin')
+          return
+        } else if (item?.reported_by && item.reported_by !== profile.id) {
+          setResolvedRecipientId(item.reported_by)
+          setResolvedRecipientName(item.reporter?.name || 'Item Finder')
+          return
+        }
+      }
+
+      // 4. Fallback from latest message in thread
       const otherMsg = [...currentMessages]
         .reverse()
         .find((m) => m.sender_id !== profile.id)
       if (otherMsg) {
         setResolvedRecipientId(otherMsg.sender_id)
-        setResolvedRecipientName(otherMsg.sender?.name ?? (otherMsg.sender?.role === 'admin' ? 'Campus Admin' : 'User'))
+        setResolvedRecipientName(
+          otherMsg.sender?.name ?? (otherMsg.sender?.role === 'admin' ? 'Campus Admin' : 'User'),
+        )
         return
-      }
-
-      // 4. If current user is a Finder or Claimant messaging an Admin:
-      const { data: adminData } = await supabase
-        .from('profiles')
-        .select('id, name')
-        .eq('role', 'admin')
-        .eq('active', true)
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle()
-
-      if (adminData) {
-        setResolvedRecipientId(adminData.id)
-        setResolvedRecipientName(adminData.name || 'Campus Admin')
-      } else if (item?.reported_by && item.reported_by !== profile.id) {
-        setResolvedRecipientId(item.reported_by)
-        setResolvedRecipientName(item.reporter?.name || 'Item Finder')
       }
     },
     [profile, defaultRecipientId, claim, item],
@@ -225,18 +231,26 @@ export default function ClaimMessagingModal({
     const text = body.trim()
     if (!text || !profile || (!claimId && !itemId) || sending) return
 
-    let targetRecipient = resolvedRecipientId
+    let targetRecipient = defaultRecipientId || resolvedRecipientId
 
-    // If still unresolved, fetch active admin
+    // If still unresolved, determine by role
     if (!targetRecipient) {
-      const { data: admin } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('role', 'admin')
-        .eq('active', true)
-        .limit(1)
-        .maybeSingle()
-      targetRecipient = admin?.id ?? null
+      if (profile.role === 'admin') {
+        if (claim?.claimant_uid && claim.claimant_uid !== profile.id) {
+          targetRecipient = claim.claimant_uid
+        } else if (item?.reported_by && item.reported_by !== profile.id) {
+          targetRecipient = item.reported_by
+        }
+      } else {
+        const { data: admin } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('role', 'admin')
+          .eq('active', true)
+          .limit(1)
+          .maybeSingle()
+        targetRecipient = admin?.id ?? null
+      }
     }
 
     if (!targetRecipient) {
@@ -284,17 +298,25 @@ export default function ClaimMessagingModal({
     setSharingContact(true)
 
     const contactText = `My contact details: ${profile.name} (${profile.email}). Please use this to coordinate regarding this item.`
-    let targetRecipient = resolvedRecipientId
+    let targetRecipient = defaultRecipientId || resolvedRecipientId
 
     if (!targetRecipient) {
-      const { data: admin } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('role', 'admin')
-        .eq('active', true)
-        .limit(1)
-        .maybeSingle()
-      targetRecipient = admin?.id ?? null
+      if (profile.role === 'admin') {
+        if (claim?.claimant_uid && claim.claimant_uid !== profile.id) {
+          targetRecipient = claim.claimant_uid
+        } else if (item?.reported_by && item.reported_by !== profile.id) {
+          targetRecipient = item.reported_by
+        }
+      } else {
+        const { data: admin } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('role', 'admin')
+          .eq('active', true)
+          .limit(1)
+          .maybeSingle()
+        targetRecipient = admin?.id ?? null
+      }
     }
 
     if (!targetRecipient) {

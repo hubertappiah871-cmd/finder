@@ -750,9 +750,9 @@ export default function ItemDetailPage() {
           claim={activeMessagingClaim}
           item={messagingItem}
           defaultRecipientId={
-            activeMessagingClaim
-              ? (profile?.role === 'admin' ? activeMessagingClaim.claimant_uid : undefined)
-              : (messagingItem?.reported_by || undefined)
+            profile?.role === 'admin'
+              ? (activeMessagingClaim?.claimant_uid || messagingItem?.reported_by || undefined)
+              : undefined
           }
           onClose={() => {
             setActiveMessagingClaim(null)
