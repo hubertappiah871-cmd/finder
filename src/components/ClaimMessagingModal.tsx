@@ -45,6 +45,13 @@ export default function ClaimMessagingModal({
   const claimId = claim?.id ?? null
   const itemId = item?.id ?? claim?.item?.id ?? claim?.item_id ?? null
 
+  // Reset conversation state when switching to a different claim, item, or recipient
+  useEffect(() => {
+    setMessages([])
+    setResolvedRecipientId(defaultRecipientId ?? null)
+    setResolvedRecipientName('')
+  }, [claimId, itemId, defaultRecipientId])
+
   const scrollToBottom = useCallback(() => {
     threadEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
@@ -57,22 +64,20 @@ export default function ClaimMessagingModal({
       // 1. If explicit default recipient was passed and isn't current user
       if (defaultRecipientId && defaultRecipientId !== profile.id) {
         setResolvedRecipientId(defaultRecipientId)
+        const { data: recProf } = await supabase
+          .from('profiles')
+          .select('name, role')
+          .eq('id', defaultRecipientId)
+          .maybeSingle()
+        if (recProf) {
+          setResolvedRecipientName(recProf.name || (recProf.role === 'admin' ? 'Campus Admin' : 'User'))
+        }
         return
       }
 
-      // 2. If there's an existing message from someone else in this thread, message them back
-      const otherMsg = [...currentMessages]
-        .reverse()
-        .find((m) => m.sender_id !== profile.id)
-      if (otherMsg) {
-        setResolvedRecipientId(otherMsg.sender_id)
-        setResolvedRecipientName(otherMsg.sender?.name ?? (otherMsg.sender?.role === 'admin' ? 'Campus Admin' : 'User'))
-        return
-      }
-
-      // 3. If current user is Admin:
+      // 2. If current user is Admin:
       if (profile.role === 'admin') {
-        if (claim?.claimant_uid) {
+        if (claim?.claimant_uid && claim.claimant_uid !== profile.id) {
           setResolvedRecipientId(claim.claimant_uid)
           setResolvedRecipientName(claim.claimant?.name ?? 'Claimant')
           return
@@ -82,6 +87,16 @@ export default function ClaimMessagingModal({
           setResolvedRecipientName(item.reporter?.name ?? 'Item Finder / Reporter')
           return
         }
+      }
+
+      // 3. If there's an existing message from someone else in this specific thread, message them back
+      const otherMsg = [...currentMessages]
+        .reverse()
+        .find((m) => m.sender_id !== profile.id)
+      if (otherMsg) {
+        setResolvedRecipientId(otherMsg.sender_id)
+        setResolvedRecipientName(otherMsg.sender?.name ?? (otherMsg.sender?.role === 'admin' ? 'Campus Admin' : 'User'))
+        return
       }
 
       // 4. If current user is a Finder or Claimant messaging an Admin:
@@ -311,9 +326,10 @@ export default function ClaimMessagingModal({
   }
 
   const otherPartyTitle =
-    profile?.role === 'admin'
-      ? (resolvedRecipientName || claim?.claimant?.name || item?.reporter?.name || 'User')
-      : (resolvedRecipientName || 'Campus Admin')
+    resolvedRecipientName ||
+    (profile?.role === 'admin'
+      ? (claim?.claimant?.name || item?.reporter?.name || 'User')
+      : 'Campus Admin')
 
   return (
     <div
@@ -365,8 +381,8 @@ export default function ClaimMessagingModal({
               </span>
               <h4>No messages yet</h4>
               <p>
-                Send a message regarding this item. All messages are securely delivered
-                in real time.
+                Send a message to {otherPartyTitle} regarding this item. All messages
+                are delivered in real time.
               </p>
             </div>
           ) : (

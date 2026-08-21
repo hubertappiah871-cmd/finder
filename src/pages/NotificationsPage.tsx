@@ -89,13 +89,30 @@ export default function NotificationsPage() {
     setLoadingReply(true)
 
     try {
-      // Extract item title in quotes if present (e.g. “MacBook Pro” or "Keys")
+      // 1. Extract item title in quotes if present (e.g. “MacBook Pro” or "Keys")
       const quoteMatch = n.message.match(/[“"']([^“”"']+)["”']/)
       const title = quoteMatch ? quoteMatch[1] : null
 
       let targetItem: ItemWithReporter | null = null
       let targetClaim: ClaimWithRelations | null = null
       let targetRecipientId: string | undefined
+
+      // 2. Extract sender name if message format is "[Name] sent you a message" or "[Name] found your lost"
+      const senderMatch = n.message.match(/^(.+?)\s+(?:sent you a message|found your lost)/i)
+      if (senderMatch) {
+        const senderName = senderMatch[1].trim()
+        if (senderName && senderName.toLowerCase() !== 'someone' && senderName.toLowerCase() !== 'a user') {
+          const { data: senderProf } = await supabase
+            .from('profiles')
+            .select('id, name, role')
+            .ilike('name', senderName)
+            .limit(1)
+            .maybeSingle()
+          if (senderProf) {
+            targetRecipientId = senderProf.id
+          }
+        }
+      }
 
       if (title) {
         const { data: itemRows } = await supabase
@@ -106,24 +123,25 @@ export default function NotificationsPage() {
 
         if (itemRows && itemRows.length > 0) {
           targetItem = itemRows[0] as ItemWithReporter
+
+          // Check if there is a specific claim for this item involving this user
+          const { data: claimRows } = await supabase
+            .from('claims')
+            .select('*, item:items!claims_item_id_fkey(*), claimant:profiles!claims_claimant_uid_fkey(*)')
+            .eq('item_id', targetItem.id)
+            .or(`claimant_uid.eq.${profile.id}${targetRecipientId ? `,claimant_uid.eq.${targetRecipientId}` : ''}`)
+            .order('created_at', { ascending: false })
+            .limit(1)
+
+          if (claimRows && claimRows.length > 0) {
+            targetClaim = claimRows[0] as unknown as ClaimWithRelations
+          }
         }
       }
 
-      // Check for related recent message to find sender/claim
-      const { data: msgRows } = await supabase
-        .from('messages')
-        .select(
-          '*, sender:profiles!messages_sender_id_fkey(name, role), claim:claims!messages_claim_id_fkey(*, item:items!claims_item_id_fkey(*), claimant:profiles!claims_claimant_uid_fkey(*))',
-        )
-        .eq('recipient_id', profile.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-
-      if (msgRows && msgRows.length > 0) {
-        targetRecipientId = msgRows[0].sender_id
-        if (msgRows[0].claim) {
-          targetClaim = msgRows[0].claim as unknown as ClaimWithRelations
-        }
+      // If sender was not in text, and targetItem exists, fallback to item reporter or admin
+      if (!targetRecipientId && targetItem?.reported_by && targetItem.reported_by !== profile.id) {
+        targetRecipientId = targetItem.reported_by
       }
 
       setReplyContext({

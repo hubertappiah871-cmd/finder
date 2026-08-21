@@ -25,6 +25,7 @@ export default function MyClaimsPage() {
   const [tab, setTab] = useState<Tab>('claims')
   const [activeMessagingClaim, setActiveMessagingClaim] = useState<ClaimWithRelations | null>(null)
   const [activeMessagingItem, setActiveMessagingItem] = useState<ItemWithReporter | null>(null)
+  const [activeRecipientId, setActiveRecipientId] = useState<string | undefined>(undefined)
 
   const loadClaims = useCallback(async () => {
     if (!profile) return
@@ -85,10 +86,14 @@ export default function MyClaimsPage() {
 
   function openChatForClaim(claim: ClaimWithRelations) {
     setActiveMessagingItem(null)
+    setActiveRecipientId(undefined)
     setActiveMessagingClaim(claim)
   }
 
   function openChatForMessage(msg: MessageWithSender) {
+    const otherUserId = msg.sender_id === profile?.id ? msg.recipient_id : msg.sender_id
+    setActiveRecipientId(otherUserId)
+
     if (msg.claim) {
       setActiveMessagingItem(null)
       setActiveMessagingClaim(msg.claim as ClaimWithRelations)
@@ -283,9 +288,11 @@ export default function MyClaimsPage() {
         <ClaimMessagingModal
           claim={activeMessagingClaim}
           item={activeMessagingItem}
+          defaultRecipientId={activeRecipientId}
           onClose={() => {
             setActiveMessagingClaim(null)
             setActiveMessagingItem(null)
+            setActiveRecipientId(undefined)
           }}
           onMessageSent={() => void loadMessages()}
         />
