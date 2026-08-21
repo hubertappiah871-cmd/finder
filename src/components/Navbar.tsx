@@ -54,7 +54,6 @@ function useUnreadCount(): number {
 
     void fetchCount()
 
-    // Realtime channel for instantaneous notification badge updates
     const channel = supabase
       .channel(`user-notifications-${uid}`)
       .on(
@@ -124,6 +123,7 @@ export default function Navbar() {
   return (
     <header className="navbar">
       <div className="container navbar__inner">
+        {/* Brand Header */}
         <Link to="/dashboard" className="navbar__brand">
           <span className="navbar__logo">
             <GraduationCap size={20} aria-hidden="true" />
@@ -134,7 +134,7 @@ export default function Navbar() {
           </span>
         </Link>
 
-        {/* Prominent Quick Search Field */}
+        {/* Search Field */}
         <form className="navbar__search-form" onSubmit={handleSearchSubmit}>
           <Search size={15} aria-hidden="true" className="navbar__search-icon" />
           <input
@@ -147,23 +147,48 @@ export default function Navbar() {
           <kbd className="navbar__search-kbd">⌘K</kbd>
         </form>
 
+        {/* Navigation Links + Mobile Drawer User Area */}
         <nav
           className={cn('navbar__links', menuOpen && 'navbar__links--open')}
           aria-label="Main navigation"
         >
-          {links.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/dashboard'}
-              className={({ isActive }) => cn('navbar__link', isActive && 'navbar__link--active')}
+          <div className="navbar__nav-items">
+            {links.map(({ to, label, icon: Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === '/dashboard'}
+                className={({ isActive }) => cn('navbar__link', isActive && 'navbar__link--active')}
+              >
+                <Icon size={15} aria-hidden="true" />
+                <span>{label}</span>
+              </NavLink>
+            ))}
+          </div>
+
+          {/* Mobile Drawer User Info */}
+          <div className="navbar__mobile-user">
+            <div className="navbar__mobile-user-row">
+              <span className="navbar__avatar">{initials(profile.name)}</span>
+              <div className="navbar__user-meta">
+                <span className="navbar__user-name">{profile.name}</span>
+                <span className="navbar__user-role">
+                  {profile.role === 'admin' ? 'Administrator' : 'Student'}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="btn btn--small btn--outline-light navbar__mobile-logout"
+              onClick={() => void signOut()}
             >
-              <Icon size={15} aria-hidden="true" />
-              <span>{label}</span>
-            </NavLink>
-          ))}
+              <LogOut size={15} aria-hidden="true" />
+              <span>Sign out</span>
+            </button>
+          </div>
         </nav>
 
+        {/* Right Actions Bar */}
         <div className="navbar__actions">
           <button
             type="button"
@@ -185,28 +210,32 @@ export default function Navbar() {
             {unread > 0 && <span className="navbar__badge">{unread > 9 ? '9+' : unread}</span>}
           </Link>
 
-          <div className="navbar__user-divider" />
+          {/* Desktop User Section */}
+          <div className="navbar__desktop-user">
+            <div className="navbar__user-divider" />
 
-          <div className="navbar__user">
-            <span className="navbar__avatar">{initials(profile.name)}</span>
-            <span className="navbar__user-meta">
-              <span className="navbar__user-name">{profile.name}</span>
-              <span className="navbar__user-role">
-                {profile.role === 'admin' ? 'Administrator' : 'Student'}
+            <div className="navbar__user">
+              <span className="navbar__avatar">{initials(profile.name)}</span>
+              <span className="navbar__user-meta">
+                <span className="navbar__user-name">{profile.name}</span>
+                <span className="navbar__user-role">
+                  {profile.role === 'admin' ? 'Administrator' : 'Student'}
+                </span>
               </span>
-            </span>
+            </div>
+
+            <button
+              type="button"
+              className="navbar__icon-btn"
+              title="Sign out"
+              aria-label="Sign out"
+              onClick={() => void signOut()}
+            >
+              <LogOut size={17} aria-hidden="true" />
+            </button>
           </div>
 
-          <button
-            type="button"
-            className="navbar__icon-btn"
-            title="Sign out"
-            aria-label="Sign out"
-            onClick={() => void signOut()}
-          >
-            <LogOut size={17} aria-hidden="true" />
-          </button>
-
+          {/* Mobile Menu Toggle Button */}
           <button
             type="button"
             className="navbar__icon-btn navbar__menu-toggle"

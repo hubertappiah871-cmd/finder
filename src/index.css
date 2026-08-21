@@ -536,6 +536,16 @@ a {
   gap: 8px;
 }
 
+.navbar__desktop-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.navbar__mobile-user {
+  display: none;
+}
+
 .navbar__user-divider {
   width: 1px;
   height: 24px;
@@ -4035,11 +4045,24 @@ textarea.input {
     display: none;
   }
 
+  .navbar__desktop-user {
+    display: none !important;
+  }
+
+  .navbar__search-kbd {
+    display: none !important;
+  }
+
   .navbar__search-form {
     order: 4;
     width: 100%;
-    margin: 8px 0 4px;
+    margin: 6px 0 2px;
     flex: 1 1 100%;
+    max-width: 100%;
+  }
+
+  .navbar__search-input {
+    padding: 0 16px 0 36px;
   }
 
   .navbar__inner {
@@ -4051,24 +4074,71 @@ textarea.input {
 
   .navbar__links {
     display: none;
-    order: 3;
+    order: 5;
     width: 100%;
     flex-direction: column;
     margin-left: 0;
-    padding: 6px 0 10px;
+    padding: 12px 14px 16px;
+    background: #071d34;
+    border: 1.5px solid rgba(226, 181, 41, 0.3);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+    margin-top: 8px;
   }
 
   .navbar__links--open {
     display: flex;
+    animation: fadeUp 0.25s var(--ease-out) both;
+  }
+
+  .navbar__nav-items {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+  }
+
+  .navbar__nav-items .navbar__link {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+
+  .navbar__mobile-user {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+  }
+
+  .navbar__mobile-user-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .navbar__mobile-logout {
+    width: 100%;
+    justify-content: center;
+    padding: 10px 14px;
+    border: 1.5px solid rgba(255, 255, 255, 0.3) !important;
+    color: #ffffff !important;
+  }
+
+  .navbar__mobile-logout:hover {
+    background: rgba(255, 255, 255, 0.16) !important;
   }
 
   .navbar__menu-toggle {
     display: grid;
-    margin-left: auto;
   }
 
   .navbar__actions {
     margin-left: auto;
+    gap: 8px;
   }
 }
 
